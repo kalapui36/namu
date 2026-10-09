@@ -41,6 +41,8 @@ window.MT = window.MT || {};
   MT.budSVG = function () {
     return '<svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20 6 C30 14 31 28 20 34 C9 28 10 14 20 6 Z" fill="#FFB3C7" stroke="#E07C9C" stroke-width="2"/><path d="M20 34 C14 33 10 29 9 25 C13 27 17 28 20 30 C23 28 27 27 31 25 C30 29 26 33 20 34 Z" fill="#8CC97A" stroke="#5E9E4E" stroke-width="1.6"/><path d="M20 34 V45" stroke="#5E9E4E" stroke-width="2.4" stroke-linecap="round"/></svg>';
   };
+  // 잔디 그림(bg-grass.jpg)에서 잰 풀밭 시작 높이 (왼쪽 끝부터 오른쪽 끝까지 11곳, 그림 높이 대비)
+  MT.GRASS_LINE = [0.912, 0.87, 0.837, 0.803, 0.8, 0.81, 0.8, 0.808, 0.841, 0.859, 0.912];
   MT.wildFlowerSVG = function (tone) {
     var c = [['#FFC0D2', '#E9849F'], ['#FFF0A0', '#E2B13C'], ['#D9C8FF', '#A98BE3']][tone];
     var p = '';
@@ -93,8 +95,6 @@ window.MT = window.MT || {};
     this.bgGrass = el('div', 'bv-bg bv-bg-grass', root);
     this.bgBase.style.backgroundImage = 'url("' + MT.IMG.bgBase + '")';
     this.bgGrass.style.backgroundImage = 'url("' + MT.IMG.bgGrass + '")';
-    this.sun = el('div', 'bv-sun', root);
-    el('div', 'bv-sun-rays', this.sun);
     this.center = el('div', 'bv-center', root);
     this.arc = el('div', 'bv-arc', this.center);
     this.field = el('div', 'bv-field', this.center);
@@ -205,22 +205,31 @@ window.MT = window.MT || {};
     var prevN = this._rbN || 0; this._rbN = n;
     var r = MT.rng(7);
     // 풀꽃
-    var nf = n >= 2 ? Math.min(25, 4 + Math.max(0, n - 6) * 3) : 0;
+    var nf = n >= 2 ? Math.min(25, 4 + Math.max(0, n - 5) * 3) : 0;
     this.field.innerHTML = '';
-    // 잔디가 보이는 땅에만: 잔디 그림의 풀밭 높이와 지금 자란 만큼 중 더 아래부터, 칸 줄 바로 위까지
-    var bottom = c.y + c.h - 2, top = Math.max(g.H * 0.8, g.H * (1 - (gp || 0)) + g.H * 0.04);
-    if (top > bottom - g.H * 0.03) top = bottom - g.H * 0.03;
-    for (var i = 0; i < nf; i++) {
-      var x = 0.03 + 0.94 * r(), y = (top + (bottom - top) * r() - c.y) / c.h;
-      var f = el('div', 'bv-wild' + (grow && i >= this._nf ? ' pop' : ''), this.field);
-      f.innerHTML = MT.wildFlowerSVG(i % 3);
-      f.style.left = (x * 100) + '%'; f.style.top = (y * 100) + '%'; f.style.width = (g.cs * (0.36 + 0.12 * r())) + 'px';
+    // 잔디가 보이는 땅에만: 잔디 그림의 언덕 모양 선(가운데 높고 양끝 낮음)을
+    // 화면 비율에 맞게 잘리고 커진 만큼 계산해서, 그 선보다 아래에만 피게 함
+    var IW = 1600, IH = 1051, sc = Math.max(g.W / IW, g.H / IH), dw = IW * sc, dh = IH * sc, ox = (g.W - dw) / 2, oy = g.H - dh;
+    var bottom = c.y + c.h - 2, reveal = g.H * (1 - (gp || 0));
+    function grassTop(x) {
+      var u = Math.max(0, Math.min(1, (x - ox) / dw)) * (MT.GRASS_LINE.length - 1), i0 = Math.floor(u), i1 = Math.min(MT.GRASS_LINE.length - 1, i0 + 1);
+      var f = MT.GRASS_LINE[i0] + (MT.GRASS_LINE[i1] - MT.GRASS_LINE[i0]) * (u - i0);
+      return Math.max(oy + f * dh, reveal) + g.H * 0.025;
     }
+    var placed = 0;
+    for (var tries = 0; placed < nf && tries < nf * 30; tries++) {
+      var bx = c.x + c.w * (0.03 + 0.94 * r()), top = grassTop(bx);
+      if (top >= bottom) continue;
+      var by = top + (bottom - top) * r();
+      var f = el('div', 'bv-wild' + (grow && placed >= this._nf ? ' pop' : ''), this.field);
+      f.innerHTML = MT.wildFlowerSVG(placed % 3);
+      f.style.left = ((bx - c.x) / c.w * 100) + '%'; f.style.top = ((by - c.y) / c.h * 100) + '%'; f.style.width = (g.cs * (0.36 + 0.12 * r())) + 'px';
+      placed++;
+    }
+    nf = placed;
     this._nf = nf;
-    // 햇살
-    this.sun.classList.toggle('on', n >= 4);
     // 나비
-    var nb = n >= 3 ? Math.min(6, 1 + Math.max(0, n - 6)) : 0;
+    var nb = n >= 3 ? Math.min(6, 1 + Math.max(0, n - 5)) : 0;
     if (this.flies.childNodes.length !== nb || force) {
       this.flies.innerHTML = '';
       for (var b = 0; b < nb; b++) {
@@ -232,9 +241,9 @@ window.MT = window.MT || {};
     }
     // 다람쥐(5번째)와 새(6번째, 9번째)
     var critters = [];
-    if (n >= 5) critters.push({ kind: 'squirrel', at: [0.3, 0.44], from: 5 });
-    if (n >= 6) critters.push({ kind: 'bird0', at: [0.78, 0.16], from: 6 });
-    if (n >= 9) critters.push({ kind: 'bird1', at: [0.22, 0.22], from: 9, flip: true });
+    if (n >= 4) critters.push({ kind: 'squirrel', at: [0.3, 0.44], from: 4 });
+    if (n >= 5) critters.push({ kind: 'bird0', at: [0.78, 0.16], from: 5 });
+    if (n >= 8) critters.push({ kind: 'bird1', at: [0.22, 0.22], from: 8, flip: true });
     var ckey = critters.map(function (k) { return k.kind; }).join(',');
     if (this._ckey !== ckey || force) {
       this._ckey = ckey;

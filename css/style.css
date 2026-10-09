@@ -456,17 +456,16 @@ button.bv-cell:active { scale: .97; }
 .how-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .how-head h2 { margin: 0 !important; }
 
-/* 햇살 */
-.bv-sun { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 2.5s ease;
-  background: radial-gradient(ellipse 60% 55% at 92% 0%, rgba(255, 238, 170, .75), rgba(255, 230, 150, .25) 45%, transparent 70%); mix-blend-mode: screen; }
-.bv-sun.on { opacity: 1; }
-.bv-sun-rays { position: absolute; right: -25%; top: -45%; width: 110%; aspect-ratio: 1; opacity: .5;
-  background: repeating-conic-gradient(from 200deg at 50% 50%, rgba(255, 240, 180, .55) 0deg 5deg, transparent 5deg 14deg);
-  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 35%, transparent 62%); mask-image: radial-gradient(circle, #000 0%, rgba(0,0,0,.6) 35%, transparent 62%);
-  animation: rays 40s linear infinite; }
-@keyframes rays { to { rotate: 360deg; } }
 /* 다람쥐 */
 .bv-squirrel { position: absolute; transform: translate(-50%, -88%); }
 .bv-squirrel svg { display: block; width: 100%; height: auto; }
 .bv-squirrel .sq-tail { transform-origin: 26px 62px; animation: tail 2.4s ease-in-out infinite; }
 @keyframes tail { 0%, 70%, 100% { transform: rotate(0); } 80% { transform: rotate(-7deg); } 90% { transform: rotate(4deg); } }
+
+.drop.small { padding: 12px; gap: 6px; flex-direction: row; flex-wrap: wrap; justify-content: center; border-width: 3px; border-radius: 18px; }
+.face-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.face-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.face-item img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--line); background: #fff; }
+.face-item.warn img { border-color: #F2B36B; }
+.face-btns { display: flex; gap: 4px; }
+.face-btns .btn { min-height: 32px; font-size: 14px; padding: 4px 10px; box-shadow: 0 3px 0 #E6CBAE; }

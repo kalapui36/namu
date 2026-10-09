@@ -169,6 +169,22 @@ window.MT = window.MT || {};
       if (MT.voice.isEdge && /Natural|Online/i.test(n)) return { pitch: isQuestion ? 1.45 : 1.55, rate: isQuestion ? 1.0 : 1.05 };
       return { pitch: 1, rate: 1 };
     },
+    // 여러 문장을 한 문장씩 쉬어 가며 읽기
+    speakSeq: function (lines, opts) {
+      if (!('speechSynthesis' in window)) return false;
+      var wasBusy = speechSynthesis.speaking || speechSynthesis.pending;
+      speechSynthesis.cancel();
+      var v = MT.voice.pick(), t = MT.voice.tune(v, !!(opts && opts.question));
+      var go = function () {
+        lines.forEach(function (line) {
+          var u = new SpeechSynthesisUtterance(MT.readable(line));
+          u.lang = 'ko-KR'; if (v) u.voice = v; u.pitch = t.pitch; u.rate = t.rate;
+          speechSynthesis.speak(u);
+        });
+      };
+      if (wasBusy) setTimeout(go, 150); else go();
+      return true;
+    },
     speak: function (text, opts) {
       if (!('speechSynthesis' in window)) return false;
       var wasBusy = speechSynthesis.speaking || speechSynthesis.pending;

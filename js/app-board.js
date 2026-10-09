@@ -156,10 +156,9 @@
       var line = n === 1 ? '와, 무지개 칸이야! 땅에 초록 잔디가 자라났어!'
         : n === 2 ? '무지개 칸이야! 잔디밭에 예쁜 풀꽃이 피었어!'
         : n === 3 ? '무지개 칸이야! 팔랑팔랑, 나비가 놀러 왔어!'
-        : n === 4 ? '무지개 칸이야! 따뜻한 햇살이 우리 나무를 비춰 줘!'
-        : n === 5 ? '무지개 칸이야! 다람쥐가 나무에 놀러 왔어!'
-        : n === 6 ? '무지개 칸이야! 짹짹, 작은 새가 나무에 앉았어!'
-        : n === 9 ? '무지개 칸이야! 새 친구가 한 마리 더 왔어!'
+        : n === 4 ? '무지개 칸이야! 다람쥐가 나무에 놀러 왔어!'
+        : n === 5 ? '무지개 칸이야! 짹짹, 작은 새가 나무에 앉았어!'
+        : n === 8 ? '무지개 칸이야! 새 친구가 한 마리 더 왔어!'
         : '무지개 칸이야! 풀꽃이 더 피고 나비도 또 왔어!';
       setFairy(line + ' ' + cell + '번 칸을 눌러 미션도 해 보자.', 'cheer');
       MT.sfx.rainbow();
@@ -231,13 +230,10 @@
     var body = h('div', { class: 'qbody' }, [chips, h('h2', { class: 'qtext', id: 'qtext', text: q.text })]);
     if (q.draw) body.appendChild(h('div', { class: 'qgifts', id: 'qgifts' }));
     if (popup.revealed && q.answer) body.appendChild(h('div', { class: 'qanswer' }, [h('small', { text: '정답' }), q.answer]));
-    if (popup.help) body.appendChild(h('p', { class: 'qhelp', text: '모둠 친구들이 함께 생각해 줄 시간이에요. 천천히 해도 괜찮아요. 친구가 힌트를 주거나 같이 해 볼까요?' }));
 
     var actions = h('div', { class: 'qactions' });
     if (isQuiz && q.answer && !popup.revealed) actions.appendChild(h('button', { class: 'btn big', type: 'button', html: ICON.eye + '정답 보기', onclick: function () { popup.revealed = true; drawPopup(); pushSync(); } }));
     actions.appendChild(h('button', { class: 'btn big primary', type: 'button', html: ICON.leaf + (isQuiz ? '맞았어요!' : '해냈어요!'), onclick: success }));
-    if (!popup.help) actions.appendChild(h('button', { class: 'btn big sky', type: 'button', html: ICON.help + '친구야 도와줘', onclick: function () { popup.help = true; setFairy('괜찮아, 친구들이 도와줄 거야. 같이 생각해 보자!', 'guide'); renderFairy(); drawPopup(); pushSync(); } }));
-    actions.appendChild(h('button', { class: 'btn big', type: 'button', html: ICON.later + '다음에 다시 해요', onclick: closePopup }));
     body.appendChild(actions);
 
     var top = h('div', { class: 'qtop' }, [
@@ -262,17 +258,21 @@
     var bonus = team < 0 ? prev.length > 0 : prev.some(function (t) { return t !== team; });
     G.cleared[cell] = prev.concat([team]);
     var n = Math.max(1, S.leafPerWin || 6), k = G.leaves.length;
+    var rec = { cell: cell, team: team, leaves: [], bud: null };
     var b = $('#qback'); if (b) b.remove();
     popup = null;
     if (bonus) setFairy('정말 잘했어! 우리 반 나무에 나뭇잎이 ' + n + '장 자랐어. 다른 모둠이 다녀간 칸이라 꽃봉오리도 하나 달렸어!', 'cheer');
     else setFairy('정말 잘했어! 우리 반 나무에 나뭇잎이 ' + n + '장 자랐어.', 'cheer');
     saveClass(); render();
+    G.undo = (G.undo || []).concat([rec]).slice(-5);
     for (var j = 0; j < n; j++) (function (j) {
       var leaf = { id: MT.uid(), team: team, img: Math.floor(Math.random() * 4), rot: Math.round(Math.random() * 120 - 60), s: +(0.85 + Math.random() * 0.3).toFixed(2) };
+      rec.leaves.push(leaf.id);
       setTimeout(function () { fly('leaf', k + j, leaf.img, function () { G.leaves.push(leaf); MT.sfx.leaf(j); saveClass(); render(); }); }, j * 140);
     })(j);
     if (bonus) {
       var bud = { id: MT.uid(), team: team }, kb = G.buds.length;
+      rec.bud = bud.id;
       setTimeout(function () { fly('bud', kb, 0, function () { G.buds.push(bud); MT.sfx.bud(); saveClass(); render(); }); }, n * 140 + 200);
     }
   }
@@ -292,6 +292,23 @@
       { transform: 'translate(' + tx + 'px,' + ty + 'px) scale(' + endScale + ') rotate(320deg)', opacity: 1 }
     ], { duration: 1150, easing: 'cubic-bezier(.45,0,.35,1)' });
     anim.onfinish = function () { e.remove(); done(); };
+  }
+
+  function undoLast() {
+    var rec = (G.undo || [])[G.undo.length - 1];
+    if (!rec) { toast('되돌릴 나뭇잎이 없어요.'); return; }
+    MT.ask('방금 자란 나뭇잎 ' + rec.leaves.length + '장' + (rec.bud ? '과 꽃봉오리 1개' : '') + '를 되돌릴까요?', '되돌리기', '취소').then(function (ok) {
+      if (!ok) return;
+      var ids = {}; rec.leaves.forEach(function (id) { ids[id] = 1; });
+      G.leaves = G.leaves.filter(function (l) { return !ids[l.id]; });
+      if (rec.bud) G.buds = G.buds.filter(function (b) { return b.id !== rec.bud; });
+      var cl = G.cleared[rec.cell] || [], at = cl.lastIndexOf(rec.team);
+      if (at >= 0) cl.splice(at, 1);
+      if (!cl.length) delete G.cleared[rec.cell];
+      G.undo.pop();
+      saveClass(); render(true);
+      toast('되돌렸어요.');
+    });
   }
 
   /* ---------- 꽃 ---------- */
@@ -316,12 +333,11 @@
       h('h2', { id: 'bloomTitle', text: '우리 나무에 꽃이 활짝 피었어요!' }),
       h('p', { text: '우리 반 모두가 함께 키운 나무야. 정말 고마워!' }),
       h('div', { class: 'qactions', style: 'justify-content:center' }, [
-        h('button', { class: 'btn big sky', type: 'button', html: ICON.speak + '요정 목소리 듣기', onclick: function () { speak(line); } }),
+        h('button', { class: 'btn round icon', type: 'button', 'aria-label': '요정 말 듣기', title: '요정 말 듣기', html: ICON.speak, onclick: function () { speak(line); } }),
         h('button', { class: 'btn big primary', type: 'button', text: '나무 보러 가기', onclick: function () { back.remove(); } })
       ])
     ]));
     $('#layer').appendChild(back);
-    setTimeout(function () { speak(line); }, 600);
   }
 
   function resetGame() {
@@ -372,7 +388,10 @@
       h('img', { src: MT.IMG.fairyGuide, alt: '나무 요정' }),
       h('div', null, [
         h('div', { class: 'how-head' }, [h('h2', { id: 'howTitle', text: '이렇게 놀아요' }),
-          h('button', { class: 'btn round icon', type: 'button', 'aria-label': '요정이 읽어 주기', title: '요정이 읽어 주기', html: ICON.speak, onclick: function () { speak('안녕! 나는 나무 요정이야. ' + HOWTO.join(' ')); } })]),
+          h('button', { class: 'btn round icon', type: 'button', 'aria-label': '요정이 읽어 주기', title: '요정이 읽어 주기', html: ICON.speak, onclick: function () {
+            var order = ['첫째', '둘째', '셋째', '넷째', '다섯째'];
+            if (!MT.voice.speakSeq(['안녕, 나는 나무 요정이야!', '게임 방법을 알려 줄게.'].concat(HOWTO.map(function (t, i) { return order[i] + ', ' + t; })))) toast('이 기기에서는 읽어 주기를 쓸 수 없어요.');
+          } })]),
         h('ol', null, HOWTO.map(function (t) { return h('li', { text: t }); })),
         h('div', { class: 'qactions' }, [
           h('button', { class: 'btn big primary', type: 'button', text: '시작하기', onclick: function () { back.remove(); if ('speechSynthesis' in window) speechSynthesis.cancel(); } })
@@ -527,6 +546,7 @@
     el.appendChild(h('div', { class: 'rowf' }, [
       h('button', { class: 'btn berry', type: 'button', text: '지금 꽃 피우기', onclick: function () { closeSettings(); G.bloomed = false; bloom(); } }),
       h('button', { class: 'btn', type: 'button', text: '꽃 다시 접기', onclick: function () { G.bloomed = false; saveClass(); render(true); toast('꽃을 다시 봉오리로 돌렸어요.'); } }),
+      h('button', { class: 'btn', type: 'button', text: '방금 자란 나뭇잎 되돌리기', disabled: (G.undo && G.undo.length) ? null : 'disabled', onclick: function () { closeSettings(); undoLast(); } }),
       h('button', { class: 'btn', type: 'button', text: '게임 방법 다시 보기', onclick: function () { closeSettings(); showHowto(); } }),
       h('button', { class: 'btn', type: 'button', text: '게임 처음부터', onclick: function () { closeSettings(); resetGame(); } })
     ]));
@@ -537,74 +557,70 @@
   }
   function closeSettingsOnly() { var b = $('#setBack'); if (b) b.remove(); }
 
-  /* 모둠과 그림 */
+  /* 모둠과 그림: 모둠 자동차마다 그림 올리는 칸 */
   function tabTeams(el) {
-    el.appendChild(h('h3', { text: '모둠 자동차' }));
-    el.appendChild(h('p', { class: 'hint', text: '창문 수는 기본 4개예요. 그림을 5장 태우면 5인승으로 저절로 바뀌어요. 빈 창문에는 나무 요정이 타요.' }));
+    el.appendChild(h('h3', { text: '모둠 자동차와 아이들 그림' }));
+    el.appendChild(h('p', { class: 'hint', text: '모둠별로 활동지를 스캔한 PDF나 사진을 그 모둠 칸에 끌어다 놓거나 눌러서 고르세요. 동그라미 안 그림만 잘라서 그 모둠 자동차에 태워요. 한 자동차에는 5명까지 탈 수 있고, 빈 창문에는 나무 요정이 타요.' }));
     var cards = h('div', { class: 'team-cards' });
     for (var t = 0; t < C.teamCount; t++) (function (t) {
       var team = C.teams[t];
-      var faces = A.filter(function (a) { return a.team === t; }).map(function (a) { return a.img; });
+      var mine = A.filter(function (a) { return a.team === t; });
       var colors = h('div', { class: 'colors', role: 'group', 'aria-label': team.name + ' 색' });
       MT.TEAM_COLORS.forEach(function (c) { colors.appendChild(h('button', { type: 'button', style: 'background:' + c, 'aria-label': '색 ' + c, 'aria-pressed': team.color === c ? 'true' : 'false', onclick: function () { team.color = c; saveClass(); render(); openSettings('teams'); } })); });
       var seats = h('select', { class: 'sel', 'aria-label': team.name + ' 창문 수', onchange: function (e) { team.seats = +e.target.value; saveClass(); render(); openSettings('teams'); } }, [3, 4, 5].map(function (n) { return h('option', { value: n, text: '창문 ' + n + '개' }); }));
       seats.value = team.seats || 4;
-      cards.appendChild(h('div', { class: 'team-card' }, [h('div', { class: 'car-prev', html: MT.carSVG(team.color, MT.carSeats(S, A, t), faces, String(t + 1)).svg }),
+      var status = h('p', { class: 'hint', style: 'margin:0', 'aria-live': 'polite', text: '탄 친구 ' + mine.length + '명' });
+      var inId = 'up' + t;
+      var input = h('input', { type: 'file', accept: '.pdf,application/pdf,image/*', multiple: true, class: 'visually-hidden', id: inId, onchange: function (e) { handleFiles(e.target.files, status, t); e.target.value = ''; } });
+      var drop = h('div', { class: 'drop small' }, [h('label', { class: 'btn sky', for: inId, text: '그림 올리기' }), input, h('span', { class: 'hint', style: 'margin:0', text: '또는 여기로 끌어다 놓기' })]);
+      drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+      drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+      drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); handleFiles(e.dataTransfer.files, status, t); });
+      var faces = h('div', { class: 'face-list' });
+      mine.forEach(function (a) { faces.appendChild(faceItem(a)); });
+      cards.appendChild(h('div', { class: 'team-card' }, [h('div', { class: 'car-prev', html: MT.carSVG(team.color, MT.carSeats(S, A, t), mine.map(function (a) { return a.img; }), String(t + 1)).svg }),
         h('input', { class: 'inp', value: team.name, 'aria-label': (t + 1) + '번 모둠 이름', oninput: function (e) { team.name = e.target.value || (t + 1) + '모둠'; saveClass(); render(); } }),
-        colors, seats, h('div', { class: 'hint', style: 'margin:0', text: '탄 친구 ' + faces.length + '명' })]));
+        colors, seats, drop, status, faces]));
     })(t);
     el.appendChild(cards);
-
-    el.appendChild(h('h3', { text: '아이들 그림 태우기' }));
-    el.appendChild(h('p', { class: 'hint', text: '활동지를 스캔한 PDF나 사진을 한꺼번에 올리면 동그라미 안 그림만 잘라서 이 반에 저장해요. 이름 칸은 모둠을 고를 때만 이 화면에 잠깐 보이고 저장하지 않아요.' }));
-    var status = h('p', { class: 'hint', 'aria-live': 'polite' });
-    var input = h('input', { type: 'file', accept: '.pdf,application/pdf,image/*', multiple: true, class: 'visually-hidden', id: 'scanInput', onchange: function (e) { handleFiles(e.target.files, status); e.target.value = ''; } });
-    var drop = h('div', { class: 'drop' }, [h('p', { text: '여기로 파일을 끌어다 놓거나' }), h('label', { class: 'btn sky', for: 'scanInput', text: '활동지 파일 고르기' }), input, h('p', { class: 'hint', style: 'margin:0', text: 'PDF 여러 쪽, JPG, PNG 모두 돼요.' })]);
-    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
-    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
-    drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); handleFiles(e.dataTransfer.files, status); });
-    el.appendChild(drop); el.appendChild(status);
-
-    var grid = h('div', { class: 'scan-grid' });
-    A.slice().sort(function (a, b) { return (a.team < 0 ? -1 : 0) - (b.team < 0 ? -1 : 0); }).forEach(function (a) {
-      var sel = h('select', { class: 'sel', 'aria-label': '이 그림의 모둠', onchange: function (e) {
-        var v = +e.target.value;
-        if (v >= 0 && A.filter(function (x) { return x.team === v && x.id !== a.id; }).length >= 5) { toast('한 자동차에는 5명까지 탈 수 있어요.'); e.target.value = a.team; return; }
-        a.team = v; Sy.putAvatar(C.id, a).catch(function () { toast('저장하지 못했어요.'); }); pushSync(); render(); openSettings('teams');
-      } }, [h('option', { value: -1, text: '모둠 고르기' })].concat(C.teams.slice(0, C.teamCount).map(function (t, i) { return h('option', { value: i, text: t.name }); })));
-      sel.value = a.team;
-      var btns = h('div', { class: 'scan-btns' });
-      if (pages[a.id]) btns.appendChild(h('button', { class: 'btn', type: 'button', text: '위치 맞추기', onclick: function () { openAdjust(a); } }));
-      btns.appendChild(h('button', { class: 'btn', type: 'button', text: '빼기', onclick: function () {
-        A = A.filter(function (x) { return x.id !== a.id; }); delete pages[a.id]; Sy.deleteAvatar(C.id, a.id).catch(function () {}); pushSync(); render(); openSettings('teams');
-      } }));
-      grid.appendChild(h('div', { class: 'scan-card' + (a.ok === false ? ' warn' : '') }, [
-        h('div', { class: 'scan-face' }, [h('img', { src: a.img, alt: '잘라낸 그림' })]),
-        nameImgs[a.id] ? h('img', { class: 'scan-name', src: nameImgs[a.id], alt: '활동지 이름 칸' }) : null,
-        a.ok === false ? h('p', { class: 'warnline', text: '동그라미를 잘 못 찾았어요. 위치를 맞춰 주세요.' }) : null,
-        sel, btns
-      ]));
-    });
-    el.appendChild(grid);
+    var loose = A.filter(function (a) { return !(a.team >= 0 && a.team < C.teamCount); });
+    if (loose.length) {
+      el.appendChild(h('h3', { text: '자동차에 타지 않은 그림' }));
+      el.appendChild(h('p', { class: 'hint', text: '모둠 수를 줄였거나 예전 방식으로 올린 그림이에요. 필요 없으면 빼 주세요.' }));
+      var lf = h('div', { class: 'face-list' }); loose.forEach(function (a) { lf.appendChild(faceItem(a)); }); el.appendChild(lf);
+    }
+  }
+  function faceItem(a) {
+    var btns = h('div', { class: 'face-btns' });
+    if (pages[a.id]) btns.appendChild(h('button', { class: 'btn', type: 'button', text: '위치', title: '위치 맞추기', onclick: function () { openAdjust(a); } }));
+    btns.appendChild(h('button', { class: 'btn', type: 'button', text: '빼기', onclick: function () {
+      A = A.filter(function (x) { return x.id !== a.id; }); delete pages[a.id]; Sy.deleteAvatar(C.id, a.id).catch(function () {}); pushSync(); render(); openSettings('teams');
+    } }));
+    return h('div', { class: 'face-item' + (a.ok === false ? ' warn' : ''), title: a.ok === false ? '동그라미를 잘 못 찾았어요. 위치를 맞춰 주세요.' : '' }, [h('img', { src: a.img, alt: '아이 그림' }), btns]);
   }
 
-  async function handleFiles(files, status) {
+  async function handleFiles(files, status, team) {
     if (!files || !files.length) return;
+    var room = 5 - A.filter(function (a) { return a.team === team; }).length;
+    if (room <= 0) { toast('한 자동차에는 5명까지 탈 수 있어요.'); return; }
     status.textContent = '파일을 읽고 있어요…';
     try {
       var cvs = await MT.Scan.toPages(Array.from(files), function (m) { status.textContent = m; });
+      var over = Math.max(0, cvs.length - room); cvs = cvs.slice(0, room);
       var bad = 0;
       for (var i = 0; i < cvs.length; i++) {
         var cv = cvs[i], d = MT.Scan.detect(cv), c = MT.Scan.crop(cv, d), id = MT.uid();
         if (!d.ok) bad++;
-        pages[id] = { cv: cv, d: d }; nameImgs[id] = c.nameImg;
-        var a = { id: id, img: c.img, team: -1, ok: d.ok, ts: Date.now() + i };
+        pages[id] = { cv: cv, d: d };
+        var a = { id: id, img: c.img, team: team, ok: d.ok, ts: Date.now() + i };
         A.push(a);
-        status.textContent = (i + 1) + '/' + cvs.length + '장 저장하는 중…';
+        status.textContent = (i + 1) + '/' + cvs.length + '장 태우는 중…';
         await Sy.putAvatar(C.id, a);
       }
-      status.textContent = cvs.length + '장을 잘라서 저장했어요.' + (bad ? ' 그중 ' + bad + '장은 위치를 확인해 주세요.' : '');
+      pushSync(); render();
       openSettings('teams');
+      if (over) toast('한 자동차에는 5명까지 탈 수 있어서 ' + over + '장은 태우지 않았어요.');
+      else if (bad) toast(bad + '장은 동그라미를 잘 못 찾았어요. 노란 테두리 그림의 위치를 맞춰 주세요.');
     } catch (e) { console.error(e); status.textContent = '파일을 읽거나 저장하지 못했어요. 다른 형식으로 올리거나 인터넷을 확인해 주세요.'; }
   }
 
@@ -627,7 +643,7 @@
       h('div', { class: 'rowf', style: 'margin:0' }, [h('span', { text: '크기' }), range]),
       h('div', { class: 'qactions' }, [
         h('button', { class: 'btn primary', type: 'button', text: '이렇게 자르기', onclick: function () {
-          var c = MT.Scan.crop(src.cv, d); a.img = c.img; a.ok = true; nameImgs[a.id] = c.nameImg; src.d = d;
+          var c = MT.Scan.crop(src.cv, d); a.img = c.img; a.ok = true; src.d = d;
           Sy.putAvatar(C.id, a).catch(function () { toast('저장하지 못했어요.'); }); render(); back.remove(); openSettings('teams');
         } }),
         h('button', { class: 'btn', type: 'button', text: '취소', onclick: function () { back.remove(); } })
@@ -691,18 +707,14 @@
 
     el.appendChild(h('h3', { text: '칸마다 문제 두 개' }));
     el.appendChild(h('p', { class: 'hint', text: '칸을 처음 누르면 문제 1, 다음에 누르면 문제 2가 나와요. 비워 둔 칸에는 예시 문제가 나와요. “태블릿 그림판”에 체크하면 그 문제가 열릴 때 모든 모둠 태블릿에 그림판이 떠요.' }));
-    var pasteBox = h('div', { style: 'display:none;margin-bottom:16px' }, [
-      h('p', { class: 'hint', text: '스프레드시트에서 복사해 붙여 넣으세요. 순서: 칸 번호 | 색(노랑, 파랑, 보라, 무지개. 비워도 돼요) | 문제1 | 정답1 | 문제2 | 정답2' }),
-      h('textarea', { class: 'ta', id: 'pasteArea', rows: 8 }),
-      h('div', { class: 'qactions' }, [h('button', { class: 'btn primary', type: 'button', text: '붙여 넣은 문제 넣기', onclick: applyPaste })])
-    ]);
+    var xlStatus = h('span', { class: 'hint', style: 'margin:0', 'aria-live': 'polite' });
     el.appendChild(h('div', { class: 'rowf' }, [
-      h('button', { class: 'btn sky', type: 'button', text: '표에서 붙여넣기', onclick: function () { pasteBox.style.display = pasteBox.style.display === 'none' ? 'block' : 'none'; } }),
-      h('button', { class: 'btn', type: 'button', text: '문제 파일로 저장', onclick: exportQuestions }),
-      h('label', { class: 'btn', for: 'qImport', text: '문제 파일 불러오기' }),
-      h('input', { type: 'file', id: 'qImport', accept: '.json,application/json', class: 'visually-hidden', onchange: importQuestions })
+      h('button', { class: 'btn sky', type: 'button', text: '엑셀로 내려받기', onclick: function () { exportExcel(T).catch(function () { toast('엑셀 파일을 만들지 못했어요. 인터넷을 확인해 주세요.'); }); } }),
+      h('label', { class: 'btn', for: 'xlIn', text: '엑셀 올리기' }),
+      h('input', { type: 'file', id: 'xlIn', accept: '.xlsx,.xls', class: 'visually-hidden', onchange: function (e) { var f = e.target.files[0]; e.target.value = ''; if (f) importExcel(T, f, xlStatus); } }),
+      xlStatus
     ]));
-    el.appendChild(pasteBox);
+    el.appendChild(h('p', { class: 'hint', text: '엑셀에는 모든 칸의 문제가 지금 게임에 나오는 그대로 적혀 있어요. 고칠 칸만 고쳐서 올리면 돼요. 칸 색깔과 미션 이름은 엑셀에서 바꿔도 반영되지 않아요(위에서 바꿔 주세요).' }));
     var rows = h('div', { class: 'q-rows' });
     var blank = { cellColors: T.cellColors, questions: {} };
     for (var c = 1; c <= T.cellCount - 1; c++) (function (c) {
@@ -729,37 +741,70 @@
     })(c);
     el.appendChild(rows);
   }
-  function applyPaste() {
-    var T = editSet();
-    var txt = $('#pasteArea').value, names = { '노랑': 'yellow', '파랑': 'blue', '보라': 'purple', '무지개': 'rainbow' }, n = 0;
-    txt.split(/\r?\n/).forEach(function (line) {
-      var col = line.split('\t'); if (col.length < 2) return;
-      var cell = parseInt(col[0], 10); if (!(cell >= 1 && cell <= T.cellCount - 1)) return;
-      var rest = col.slice(1), cname = (rest[0] || '').trim();
-      if (names[cname] || cname === '') { if (names[cname]) T.cellColors[cell - 1] = names[cname]; rest = rest.slice(1); }
-      var old = T.questions[cell] || {};
-      T.questions[cell] = { q1: (rest[0] || '').trim(), a1: (rest[1] || '').trim(), q2: (rest[2] || '').trim(), a2: (rest[3] || '').trim(), d1: !!old.d1, d2: !!old.d2 };
-      n++;
+  /* 엑셀 내려받기, 올리기 */
+  var xlsxReady = null;
+  function loadXLSX() {
+    if (xlsxReady) return xlsxReady;
+    xlsxReady = new Promise(function (ok, no) {
+      if (window.XLSX) return ok(window.XLSX);
+      var sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      sc.onload = function () { ok(window.XLSX); }; sc.onerror = function (e) { xlsxReady = null; no(e); }; document.head.appendChild(sc);
     });
-    saveSet(T); render(true); openSettings('questions'); toast(n + '개 칸에 문제를 넣었어요.');
+    return xlsxReady;
   }
-  function exportQuestions() {
-    var T = editSet();
-    var data = { kind: 'namugil-questions', name: T.name, title: T.title, cellCount: T.cellCount, cellColors: T.cellColors, missions: T.missions, questions: T.questions };
-    var a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), download: T.name + '.json' });
-    document.body.appendChild(a); a.click(); a.remove();
+  var XL_HEAD = ['칸 번호', '색깔', '미션', '문제 1', '정답 1', '문제 1 그림판(O/X)', '문제 2', '정답 2', '문제 2 그림판(O/X)'];
+  async function exportExcel(X) {
+    var XLSX = await loadXLSX(), V = setView(X), rows = [XL_HEAD];
+    for (var c = 1; c <= X.cellCount - 1; c++) {
+      var color = MT.cellColor(V, c), m = X.missions[color], q1 = MT.getQuestion(V, c, 0), q2 = MT.getQuestion(V, c, 1), quiz = m.kind === 'quiz';
+      rows.push([c, MT.COLORS[color].label, m.name, q1.text, quiz ? q1.answer : '', q1.draw ? 'O' : 'X', q2.text, quiz ? q2.answer : '', q2.draw ? 'O' : 'X']);
+    }
+    var ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 48 }, { wch: 22 }, { wch: 16 }, { wch: 48 }, { wch: 22 }, { wch: 16 }];
+    var guide = XLSX.utils.aoa_to_sheet([
+      ['작성 방법'], [''],
+      ['1. "문제" 시트에서 고치고 싶은 칸의 문제와 정답만 고쳐 주세요.'],
+      ['2. 정답은 미션이 "정답이 있는 문제"인 색깔 칸에서만 쓰여요. 다른 칸은 비워 두면 돼요.'],
+      ['3. 그림판 칸에 O를 쓰면, 그 문제가 열릴 때 모든 모둠 태블릿에 그림판이 떠요. 아니면 X.'],
+      ['4. 칸 번호, 색깔, 미션 칸은 참고용이에요. 바꿔도 게임에는 반영되지 않아요.'],
+      ['5. 문제를 지워서 비워 두면 그 칸에는 기본 예시 문제가 나와요.'],
+      ['6. 다 고쳤으면 저장하고, 게임 설정 > 문제 세트 > "엑셀 올리기"로 올려 주세요.'],
+      [''], ['미션 이름 (게임 설정에서 바꿀 수 있어요)']
+    ].concat(MT.COLOR_KEYS.map(function (k) { return [MT.COLORS[k].label + ' 칸: ' + X.missions[k].name + ' (' + (X.missions[k].kind === 'quiz' ? '정답이 있는 문제' : '정답이 없는 활동') + ')']; })));
+    guide['!cols'] = [{ wch: 90 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '문제');
+    XLSX.utils.book_append_sheet(wb, guide, '작성 방법');
+    XLSX.writeFile(wb, (X.name || '문제 세트') + '.xlsx');
   }
-  function importQuestions(e) {
-    var T = editSet();
-    var f = e.target.files[0]; if (!f) return;
-    f.text().then(function (t) {
-      var d = JSON.parse(t); if (d.kind !== 'namugil-questions') throw new Error('kind');
-      if (d.cellCount) T.cellCount = d.cellCount;
-      if (d.cellColors && d.cellColors.length === T.cellCount - 1) T.cellColors = d.cellColors; else T.cellColors = MT.makeCellColors(T.cellCount - 1, T.seed);
-      if (d.missions) T.missions = d.missions; if (d.title) T.title = d.title;
-      T.questions = d.questions || {};
-      saveSet(T); render(true); openSettings('questions'); toast('문제 파일을 불러왔어요.');
-    }).catch(function () { toast('이 게임에서 저장한 문제 파일이 아니에요.'); });
+  async function importExcel(X, file, status) {
+    status.textContent = '엑셀을 읽고 있어요…';
+    try {
+      var XLSX = await loadXLSX();
+      var wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      var ws = wb.Sheets['문제'] || wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      var hi = rows.findIndex(function (r) { return String(r[0]).replace(/\s/g, '') === '칸번호'; });
+      if (hi < 0) { status.textContent = ''; MT.ask('이 게임에서 내려받은 엑셀 양식이 아니에요.\n먼저 "엑셀로 내려받기"로 양식을 받아 주세요.', '알겠어요', '닫기'); return; }
+      var V = setView(X), changes = {}, changed = [], bad = [];
+      var yes = function (v) { return /^(o|○|ㅇ|예|y|yes|true|1)$/i.test(String(v).trim()); };
+      rows.slice(hi + 1).forEach(function (r, i) {
+        if (r.every(function (v) { return String(v).trim() === ''; })) return;
+        var c = parseInt(r[0], 10);
+        if (!(c >= 1 && c <= X.cellCount - 1)) { bad.push(hi + i + 2); return; }
+        var nq = { q1: String(r[3]).trim(), a1: String(r[4]).trim(), d1: yes(r[5]), q2: String(r[6]).trim(), a2: String(r[7]).trim(), d2: yes(r[8]) };
+        var o1 = MT.getQuestion(V, c, 0), o2 = MT.getQuestion(V, c, 1);
+        var same = nq.q1 === o1.text && nq.a1 === (o1.answer || '') && nq.d1 === !!o1.draw && nq.q2 === o2.text && nq.a2 === (o2.answer || '') && nq.d2 === !!o2.draw;
+        if (!same) { changes[c] = nq; changed.push(c); }
+      });
+      status.textContent = '';
+      if (!changed.length) { MT.ask('바뀐 칸이 없어요.' + (bad.length ? '\n(' + bad.join(', ') + '번째 줄은 칸 번호가 맞지 않아서 건너뛰었어요)' : ''), '알겠어요', '닫기'); return; }
+      var msg = (X.cellCount - 1) + '칸 중 ' + changed.length + '칸이 바뀌어요.\n바뀌는 칸: ' + changed.join(', ') + '번' + (bad.length ? '\n(' + bad.join(', ') + '번째 줄은 칸 번호가 맞지 않아서 건너뛰어요)' : '') + '\n반영할까요?';
+      if (!(await MT.ask(msg, '반영하기', '취소'))) return;
+      X.questions = X.questions || {};
+      changed.forEach(function (c) { X.questions[c] = changes[c]; });
+      saveSet(X); render(true); openSettings('questions'); toast(changed.length + '칸을 반영했어요.');
+    } catch (e) { console.error(e); status.textContent = '엑셀을 읽지 못했어요. 파일을 확인해 주세요.'; }
   }
 
   /* 반과 세트 관리 */
