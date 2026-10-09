@@ -113,16 +113,16 @@
     if (p.draw) { if (!drawing || drawing.qkey !== p.qkey) openDraw(p); return; }
     var s = settingsFrom(state);
     var body = h('div', { class: 'qbody' }, [
-      h('div', { class: 'qchips' }, [h('span', { class: 'chip' }, [h('span', { class: 'dot' }), p.mission]), h('span', { class: 'chip soft', text: p.cell + '번 칸' })]),
+      h('div', { class: 'qchips' }, [h('span', { class: 'chip' }, [h('span', { class: 'dot' }), p.mission]), h('span', { class: 'chip soft', text: p.cell === 0 ? '출발 칸' : p.cell + '번 칸' })]),
       h('h2', { class: 'qtext', id: 'tqtext', text: p.text })
     ]);
-    if (p.answer) body.appendChild(h('div', { class: 'qanswer' }, [h('small', { text: '정답' }), p.answer]));
+    if (p.answer) body.appendChild(MT.answerBox(p.answer, h));
     if (p.help) body.appendChild(h('p', { class: 'qhelp', text: '모둠 친구들이 함께 생각해 줄 시간이에요. 천천히 해도 괜찮아요.' }));
     if (p.team !== null && p.team !== undefined && s.teams[p.team]) body.appendChild(h('p', { class: 'qteams-label', text: s.teams[p.team].name + ' 차례예요' }));
     var card = h('div', { class: 'qcard c-' + p.color, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'tqtext' }, [
       h('div', { class: 'qfairy' }, [h('img', { src: MT.IMG.fairyQuiz, alt: '문제를 내는 나무 요정' })]),
       body,
-      h('div', { class: 'qtop' }, [h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.text); } })])
+      h('div', { class: 'qtop' }, [h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.say || p.text); } })])
     ]);
     $('#layer').appendChild(h('div', { class: 'modal-back', id: 'tq' }, [card]));
   }
@@ -165,7 +165,7 @@
     var tools = h('div', { class: 'draw-tools' }, [pens, sizes, eraserBtn,
       h('button', { class: 'btn', type: 'button', text: '다 지우기', onclick: function () { function wipe() { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 720, 720); drawn = false; } if (!drawn) wipe(); else MT.ask('그림을 모두 지울까요?', '지우기', '그대로 두기').then(function (ok) { if (ok) wipe(); }); } }),
       sendBtn]);
-    var prompt = h('div', { class: 'draw-prompt' }, [h('span', { text: p.text }), h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.text); } })]);
+    var prompt = h('div', { class: 'draw-prompt' }, [h('span', { text: p.text }), h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.say || p.text); } })]);
     var sheet = h('div', { class: 'draw-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': '선물 그리기' }, [prompt, stage, tools]);
     var back = h('div', { class: 'modal-back', id: 'drawBack' }, [sheet]);
     $('#layer').appendChild(back);

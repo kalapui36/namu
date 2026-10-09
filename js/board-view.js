@@ -271,7 +271,10 @@ window.MT = window.MT || {};
       b.style.top = (pt[1] - g.cs / 2) + 'px';
       var num = el('span', 'bv-cell-num', b);
       var sub = el('span', 'bv-cell-sub', b);
-      if (i === 0) { b.classList.add('start'); num.textContent = '출발'; sub.textContent = 'START'; b.setAttribute('aria-label', '출발 칸'); }
+      if (i === 0) {
+        b.classList.add('start'); num.textContent = '출발'; sub.textContent = 'START'; b.setAttribute('aria-label', '출발 칸');
+        if (self.interactive) b.addEventListener('click', function () { self.opts.onCellClick && self.opts.onCellClick(0); });
+      }
       else {
         var color = MT.cellColor(settings, i);
         b.classList.add('c-' + color);
@@ -488,6 +491,12 @@ window.MT = window.MT || {};
   };
 
   MT.BoardView = BoardView;
+
+  // 예시 답: "/"로 나눈 만큼 말풍선으로
+  MT.answerBox = function (answer, h) {
+    var parts = String(answer).split('/').map(function (x) { return x.trim(); }).filter(Boolean);
+    return h('div', { class: 'qanswer' }, [h('small', { text: '이런 말도 좋아요' }), h('div', { class: 'ans-bubbles' }, parts.map(function (x) { return h('span', { class: 'ans-bubble', text: x }); }))]);
+  };
 
   // 게임 안 확인 창 (브라우저 기본 확인 창 대신)
   MT.ask = function (message, yes, no, opts) {
