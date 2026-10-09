@@ -349,3 +349,52 @@ button.bv-cell:active { scale: .97; }
 
 .class-tree { margin: 0 0 6px; padding: 12px 14px; border-radius: 20px; background: var(--leaf-soft); font-family: var(--f-display); font-size: 19px; line-height: 1.4; color: #2F5E24; word-break: keep-all; }
 .team-row { grid-template-columns: 120px 1fr; }
+
+/* 나무에 매단 선물 */
+.bv-gifts { position: absolute; inset: 0; pointer-events: none; }
+.bv-hang { position: absolute; translate: -50% 0; transform-origin: 50% 0; animation: swing 3.2s ease-in-out infinite alternate; }
+.bv-hang.pop { animation: pop .7s cubic-bezier(.2, 1.5, .4, 1) both, swing 3.2s ease-in-out .7s infinite alternate; }
+.bv-hang-string { display: block; width: 2px; height: var(--len, 24px); margin: 0 auto; background: #8A6A4F; border-radius: 2px; }
+.bv-hang .bv-gift { position: relative; width: 100%; transform: none; padding: 5% 5% 5%; }
+.bv-hang .bv-gift-tape { top: -6%; height: 10%; }
+@keyframes swing { from { rotate: -4deg; } to { rotate: 4deg; } }
+
+/* 자동차 위 문제 열기 단추 */
+.car-pop { position: absolute; z-index: 9000; translate: -50% -100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 16px 10px; border: 0; border-radius: 24px; background: #fff; color: var(--ink); font-family: var(--f-display); font-size: 20px; box-shadow: 0 5px 0 #E6CBAE, 0 10px 20px rgba(90, 60, 40, .25); animation: pop .4s cubic-bezier(.2, 1.5, .4, 1); }
+.car-pop::after { content: ''; position: absolute; bottom: -10px; left: 50%; translate: -50% 0; border: 10px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.car-pop svg { width: 30px; height: 30px; }
+
+/* 게임 접속하기 화면 */
+.join-show { background: #FFFCF6; border-radius: 48px; padding: 34px 50px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; box-shadow: 0 30px 60px rgba(80, 50, 30, .3); animation: cardIn .45s cubic-bezier(.2, 1.3, .4, 1); max-height: 94vh; }
+.join-show h2 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: clamp(30px, 3vw, 48px); }
+.join-show .qr { background: #fff; padding: 18px; border-radius: 26px; box-shadow: inset 0 0 0 4px var(--line); }
+.join-show .qr img, .join-show .qr canvas { display: block; width: min(52vh, 520px) !important; height: min(52vh, 520px) !important; image-rendering: pixelated; }
+.join-room { font-family: var(--f-display); font-size: clamp(30px, 3vw, 44px); }
+.join-room b { font-weight: 400; font-size: 1.7em; letter-spacing: .1em; color: var(--leaf-d); }
+
+/* 반 고르기 */
+.class-chip { font-family: var(--f-display); font-size: 20px; padding: 6px 16px; border-radius: 999px; background: #fff; color: var(--ink-2); box-shadow: 0 3px 0 var(--panel-edge); }
+.picker { width: min(900px, 94vw); max-height: 92vh; overflow: auto; background: #FFFCF6; border-radius: 40px; padding: 30px 34px; display: flex; flex-direction: column; gap: 16px; animation: cardIn .4s cubic-bezier(.2, 1.2, .4, 1); }
+.picker h2 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: 34px; }
+.class-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.class-list button { min-height: 96px; border: 0; border-radius: 26px; background: #fff; box-shadow: 0 5px 0 #E6CBAE; font-family: var(--f-display); font-size: 26px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px; }
+.class-list button small { font-family: var(--f-body); font-size: 15px; color: var(--ink-2); }
+.class-list button:active { translate: 0 3px; box-shadow: 0 2px 0 #E6CBAE; }
+
+/* 문제 창 안 선물 모음 */
+.qgifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.qgifts button { position: relative; border: 0; padding: 8px 8px 6px; background: #fff; border-radius: 16px; box-shadow: 0 6px 14px rgba(110, 70, 40, .18); font-family: var(--f-display); font-size: 16px; color: var(--ink-2); animation: pop .6s cubic-bezier(.2, 1.5, .4, 1) both; }
+.qgifts img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+.qgifts .tape { position: absolute; top: -8px; left: 32%; width: 36%; height: 16px; border-radius: 3px; opacity: .85; }
+.qgift-wait { font-size: 20px; color: var(--ink-2); }
+.q-draw { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--ink-2); }
+.q-draw input { width: 22px; height: 22px; }
+
+.draw-sheet { position: relative; grid-template-rows: auto minmax(0, 1fr); }
+.draw-prompt { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 6px 8px 0; font-family: var(--f-display); font-size: clamp(22px, 2.6vw, 34px); line-height: 1.3; word-break: keep-all; }
+.draw-prompt span { flex: 1; }
+.draw-confirm { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(255, 252, 246, .92); border-radius: 34px; }
+.draw-confirm-card { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 20px; }
+.draw-preview { width: min(40vh, 360px); aspect-ratio: 1; border-radius: 20px; box-shadow: 0 6px 14px rgba(110, 70, 40, .2); background: #fff; }
+.tab-team { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@media (max-width: 900px) { .draw-sheet { grid-template-rows: auto minmax(0, 1fr) auto; } }

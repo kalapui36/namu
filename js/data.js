@@ -52,8 +52,8 @@ window.MT = window.MT || {};
       { q1: '모둠 친구의 좋은 점을 하나 말해 줘요.', a1: '', q2: '속상할 때 나는 어떻게 하는지 말해 봐요.', a2: '' }
     ],
     rainbow: [
-      { q1: '친구에게 주고 싶은 선물을 태블릿에 그려서 보내 주세요.', a1: '', q2: '모둠 이름을 함께 지어서 크게 외쳐요.', a2: '' },
-      { q1: '다 함께 이어 말해요. “우리 반은 ___ 반!”', a1: '', q2: '나무에게 주고 싶은 선물을 태블릿에 그려서 보내 주세요.', a2: '' }
+      { q1: '친구에게 주고 싶은 선물을 태블릿에 그려서 보내 주세요.', a1: '', d1: true, q2: '모둠 이름을 함께 지어서 크게 외쳐요.', a2: '' },
+      { q1: '다 함께 이어 말해요. “우리 반은 ___ 반!”', a1: '', q2: '나무에게 주고 싶은 선물을 태블릿에 그려서 보내 주세요.', a2: '', d2: true }
     ]
   };
 
@@ -118,6 +118,54 @@ window.MT = window.MT || {};
     return s;
   };
 
+  MT.defaultSet = function (name) {
+    var seed = Math.floor(Math.random() * 1e9);
+    return { name: name || '기본 문제 세트', title: '나무 길 보드게임', cellCount: 36, seed: seed, cellColors: MT.makeCellColors(35, seed), missions: JSON.parse(JSON.stringify(MT.DEFAULT_MISSIONS)), questions: {} };
+  };
+  MT.defaultClass = function (name, setId, room) {
+    var teams = [];
+    for (var i = 0; i < 8; i++) teams.push({ name: (i + 1) + '모둠', color: MT.TEAM_COLORS[i], seats: 4 });
+    return { name: name, setId: setId, teamCount: 4, teams: teams, room: room, leafPerWin: 6, autoRead: false, game: MT.defaultGame() };
+  };
+
+  // 소리로 읽을 때 숫자 읽기: "4번 칸" → "사번 칸", "문제 1" → "문제 일"
+  MT.sino = function (n) {
+    var d = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+    n = +n;
+    if (n === 0) return '영';
+    if (n < 10) return d[n];
+    if (n < 100) { var t = Math.floor(n / 10), o = n % 10; return (t > 1 ? d[t] : '') + '십' + d[o]; }
+    return String(n);
+  };
+  MT.readable = function (text) {
+    return String(text)
+      .replace(/(\d+)\s*번\s*칸/g, function (m, n) { return MT.sino(n) + '번 칸'; })
+      .replace(/문제\s*(\d+)/g, function (m, n) { return '문제 ' + MT.sino(n); });
+  };
+
+  // 요정 목소리: 한국어 여자 목소리를 우선으로, 높고 발랄하게
+  MT.voice = {
+    pick: function () {
+      if (!('speechSynthesis' in window)) return null;
+      var ko = speechSynthesis.getVoices().filter(function (v) { return /^ko/i.test(v.lang); });
+      var prefer = [/SunHi/i, /Yuna/i, /Google.*(한국|Korean)/i, /Heami/i, /female|여성|여자/i];
+      for (var i = 0; i < prefer.length; i++) { var f = ko.filter(function (v) { return prefer[i].test(v.name); })[0]; if (f) return f; }
+      return ko[0] || null;
+    },
+    speak: function (text, opts) {
+      if (!('speechSynthesis' in window)) return false;
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(MT.readable(text));
+      u.lang = 'ko-KR';
+      u.pitch = (opts && opts.pitch) || 1.55;
+      u.rate = (opts && opts.rate) || 1.05;
+      var v = MT.voice.pick(); if (v) u.voice = v;
+      speechSynthesis.speak(u);
+      return true;
+    }
+  };
+  if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function () { speechSynthesis.getVoices(); }; }
+
   MT.ensureColors = function (s) {
     var need = s.cellCount - 1;
     if (!s.cellColors || s.cellColors.length !== need) s.cellColors = MT.makeCellColors(need, s.seed);
@@ -134,13 +182,14 @@ window.MT = window.MT || {};
     var color = MT.cellColor(s, cell);
     var own = s.questions[cell];
     var key = qi === 0 ? 'q1' : 'q2', akey = qi === 0 ? 'a1' : 'a2';
-    if (own && own[key] && own[key].trim()) return { text: own[key].trim(), answer: (own[akey] || '').trim(), sample: false };
+    var dkey = qi === 0 ? 'd1' : 'd2';
+    if (own && own[key] && own[key].trim()) return { text: own[key].trim(), answer: (own[akey] || '').trim(), sample: false, draw: !!own[dkey] };
     // 예시 문제: 같은 색 칸 중 몇 번째인지로 고름
     var nth = 0;
     for (var i = 1; i < cell; i++) if (MT.cellColor(s, i) === color) nth++;
     var bank = MT.BANK[color];
     var b = bank[nth % bank.length];
-    return { text: b[key], answer: b[akey] || '', sample: true };
+    return { text: b[key], answer: b[akey] || '', sample: true, draw: !!b[dkey] };
   };
 
   /* ---------- 저장 ---------- */

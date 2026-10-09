@@ -240,41 +240,49 @@ window.MT = window.MT || {};
     }
   };
 
-  BoardView.prototype.giftSlots = function () {
-    var g = this.geo, c = g.center, t = g.tree;
-    var size = Math.min(g.cs * 0.92, c.h / 4.3), slots = [];
-    var rx0 = (t.x - c.x) + t.w + size * 0.12, rw = c.w - rx0;
-    var cols = Math.max(1, Math.floor(rw / (size * 1.06))), rows = Math.max(1, Math.floor(c.h / (size * 1.12)));
-    for (var r = 0; r < rows; r++) for (var q = 0; q < cols; q++) slots.push([rx0 + q * size * 1.06 + size / 2, r * size * 1.12 + size / 2 + 4]);
-    // 왼쪽 위 (아래쪽은 주차장)
-    var lw = (t.x - c.x) - size * 0.12;
-    var lcols = Math.max(0, Math.floor(lw / (size * 1.06)));
-    for (var r2 = 0; r2 < Math.max(0, rows - 2); r2++) for (var q2 = 0; q2 < lcols; q2++) slots.push([q2 * size * 1.06 + size / 2, r2 * size * 1.12 + size / 2 + 4]);
-    return { size: size, slots: slots };
+  // 선물 매달 자리: 나무 가운데 높이의 가지들, 왼쪽부터 오른쪽으로 고르게
+  BoardView.prototype.hangSlots = function () {
+    if (this._hang) return this._hang;
+    var A = MT.LEAF_ANCHORS, cols = [0.16, 0.31, 0.46, 0.61, 0.76, 0.88], rows = [0.48, 0.32], out = [];
+    rows.forEach(function (ry, ri) {
+      var row = cols.map(function (cx) {
+        var best = null, bd = 1e9;
+        A.forEach(function (a) { var d = Math.hypot((a[0] - cx) * 1.2, a[1] - ry); if (d < bd) { bd = d; best = a; } });
+        return best;
+      });
+      // 한 줄 안에서 가운데부터 바깥으로
+      [2, 3, 1, 4, 0, 5].forEach(function (i) { out.push(row[i]); });
+    });
+    this._hang = out;
+    return out;
   };
 
   BoardView.prototype.drawGifts = function (game, force) {
-    var self = this, gs = this.giftSlots(), list = (game.gifts || []);
-    var shown = list.slice(-gs.slots.length);
+    var self = this, slots = this.hangSlots(), tw = this.geo.tree.w, th = this.geo.tree.h;
+    var list = (game.gifts || []).slice(-slots.length);
     if (force) { this.gifts.innerHTML = ''; this.giftEls = {}; }
+    if (this.gifts.parentNode !== this.tree) this.tree.appendChild(this.gifts);
     var keep = {};
-    shown.forEach(function (gf, i) {
+    list.forEach(function (gf, i) {
       keep[gf.id] = 1;
       var e = self.giftEls[gf.id];
-      if (!e) {
-        e = el('figure', 'bv-gift', self.gifts);
-        var tape = el('span', 'bv-gift-tape', e);
+      if (!e || e._img !== gf.img) {
+        if (e) e.remove();
+        e = el('div', 'bv-hang', self.gifts);
+        el('span', 'bv-hang-string', e);
+        var card = el('figure', 'bv-gift', e);
         var team = self.state.settings.teams[gf.team] || { color: '#ccc', name: '' };
-        tape.style.background = team.color;
-        var img = el('img', '', e); img.src = gf.img; img.alt = (team.name || '') + '이 보낸 선물 그림';
-        var cap = el('figcaption', '', e); cap.textContent = team.name || '';
+        var tape = el('span', 'bv-gift-tape', card); tape.style.background = team.color;
+        var img = el('img', '', card); img.src = gf.img; img.alt = (team.name || '') + ' 선물 그림';
         if (!force) e.classList.add('pop');
+        e._img = gf.img;
         self.giftEls[gf.id] = e;
       }
-      var s = gs.slots[i];
-      e.style.width = gs.size + 'px';
-      e.style.left = (s[0] - gs.size / 2) + 'px'; e.style.top = (s[1] - gs.size / 2) + 'px';
-      e.style.setProperty('--rot', ((hash(gf.id) % 13) - 6) + 'deg');
+      var a = slots[i];
+      e.style.left = (a[0] * 100) + '%'; e.style.top = (a[1] * 100) + '%';
+      e.style.width = (tw * 0.12) + 'px';
+      e.style.setProperty('--len', (th * (0.03 + (i % 2) * 0.025)) + 'px');
+      e.style.animationDelay = (-(hash(gf.id) % 30) / 10) + 's';
     });
     Object.keys(this.giftEls).forEach(function (id) { if (!keep[id]) { self.giftEls[id].remove(); delete self.giftEls[id]; } });
   };
@@ -339,7 +347,7 @@ window.MT = window.MT || {};
       if (self.opts.canDrag && !self.opts.canDrag()) return;
       ev.preventDefault();
       var r = self.root.getBoundingClientRect();
-      start = { id: ev.pointerId, ox: ev.clientX - r.left - parseFloat(e.style.left), oy: ev.clientY - r.top - parseFloat(e.style.top), moved: false };
+      start = { id: ev.pointerId, ox: ev.clientX - r.left - parseFloat(e.style.left), oy: ev.clientY - r.top - parseFloat(e.style.top), moved: false, sx: ev.clientX, sy: ev.clientY };
       e.setPointerCapture(ev.pointerId);
       e._dragging = true; e.classList.add('dragging'); e.classList.remove('drive');
       e.style.zIndex = 9999;
@@ -347,6 +355,10 @@ window.MT = window.MT || {};
     e.addEventListener('pointermove', function (ev) {
       if (!start || ev.pointerId !== start.id) return;
       var r = self.root.getBoundingClientRect();
+      if (!start.moved) {
+        if (start.sx === undefined) { start.sx = ev.clientX; start.sy = ev.clientY; }
+        if (Math.hypot(ev.clientX - start.sx, ev.clientY - start.sy) < 10) return;
+      }
       var x = ev.clientX - r.left - start.ox, y = ev.clientY - r.top - start.oy;
       e.style.left = x + 'px'; e.style.top = y + 'px';
       start.moved = true;
@@ -362,7 +374,10 @@ window.MT = window.MT || {};
       e._dragging = false; e.classList.remove('dragging');
       self.cellEls.forEach(function (c) { c.classList.remove('target'); });
       if (moved && hit !== undefined && hit >= 0 && self.opts.onCarDrop) self.opts.onCarDrop(team, hit);
-      else self.drawCars(self.state.settings, self.state.game, self.state.avatars, false);
+      else {
+        self.drawCars(self.state.settings, self.state.game, self.state.avatars, false);
+        if (!moved && self.opts.onCarTap) self.opts.onCarTap(team, e);
+      }
     }
     e.addEventListener('pointerup', end);
     e.addEventListener('pointercancel', end);

@@ -3,7 +3,7 @@
   var params = new URLSearchParams(location.search);
   var room = params.get('room') || localStorage.getItem('namugil.tablet.room') || '';
   var team = null, state = null, gifts = [], unsubState = null, unsubGifts = null;
-  var board = null, lastPopup = '', lastFairy = '', wasBloomed = null;
+  var board = null, lastPopup = '', lastFairy = '', wasBloomed = null, drawing = null;
 
   function $(s) { return document.querySelector(s); }
   function h(tag, attrs, kids) {
@@ -21,9 +21,7 @@
   function toast(msg) { var t = h('div', { class: 'toast', role: 'status', text: msg }); document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2600); }
   function speak(text) {
     if (!('speechSynthesis' in window)) return toast('이 기기에서는 읽어 주기를 쓸 수 없어요.');
-    speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR'; u.rate = 0.9;
-    var v = speechSynthesis.getVoices().filter(function (x) { return /^ko/i.test(x.lang); })[0]; if (v) u.voice = v;
-    speechSynthesis.speak(u);
+    MT.voice.speak(text, { pitch: 1.45, rate: 0.98 });
   }
   var SPEAK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>';
   var GIFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M2.5 9h19M12 9v11M12 9c-2-4-6-4-6-1.5S10 9 12 9zM12 9c2-4 6-4 6-1.5S14 9 12 9z"/></svg>';
@@ -33,7 +31,9 @@
     return { cellCount: st.cellCount, cellColors: st.cellColors, missions: st.missions, teams: teams, teamCount: st.teamCount, title: st.title };
   }
   function gameFrom(st) {
-    return { positions: st.positions || {}, leaves: st.leaves || [], buds: st.buds || [], cleared: st.cleared || {}, grass: st.grass || 0, bloomed: !!st.bloomed, gifts: gifts };
+    var cur = st.popup && st.popup.qkey;
+    var hang = gifts.filter(function (g) { return g.qkey !== cur; }).slice(-12);
+    return { positions: st.positions || {}, leaves: st.leaves || [], buds: st.buds || [], cleared: st.cleared || {}, grass: st.grass || 0, bloomed: !!st.bloomed, gifts: hang };
   }
 
   /* ---------- 화면: 방 들어가기 ---------- */
@@ -63,13 +63,15 @@
   function showMain() {
     var root = $('#root'); root.innerHTML = '';
     var s = settingsFrom(state);
-    var teamBox = h('div', { class: 'tab-team' }, [h('span', { class: 'car-ico', id: 'myCar' }), h('span', { id: 'myName' })]);
-    var top = h('header', { class: 'tab-top' }, [teamBox, h('div', { style: 'display:flex;gap:8px' }, [
-      h('button', { class: 'btn', type: 'button', text: '모둠 바꾸기', onclick: function () { team = null; localStorage.removeItem('namugil.tablet.team.' + room); showPickTeam(); } })
-    ])]);
+    var teamBox = h('div', { class: 'tab-team', title: '선생님: 3초 꾹 누르면 모둠을 바꿀 수 있어요' }, [h('span', { class: 'car-ico', id: 'myCar' }), h('span', { id: 'myName' })]);
+    // 모둠 바꾸기: 모둠 이름을 3초 꾹 누를 때만
+    var holdTimer = null;
+    teamBox.addEventListener('pointerdown', function () { clearTimeout(holdTimer); holdTimer = setTimeout(function () { if (confirm('모둠을 바꿀까요?')) { team = null; localStorage.removeItem('namugil.tablet.team.' + room); closeDraw(); showPickTeam(); } }, 3000); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { teamBox.addEventListener(ev, function () { clearTimeout(holdTimer); }); });
+    teamBox.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    var top = h('header', { class: 'tab-top' }, [teamBox, h('span', { class: 'class-chip', text: state.className || '' })]);
     var bwrap = h('main', { class: 'tab-board', 'aria-label': '게임판' }, [h('div', { id: 'tboard' })]);
     root.appendChild(h('div', { class: 'tab-app' }, [top, bwrap]));
-    root.appendChild(h('button', { class: 'btn primary gift-fab', type: 'button', html: GIFT + '선물 그리기', onclick: openDraw }));
     root.appendChild(h('div', { class: 'tab-fairy', 'aria-live': 'polite' }, [h('img', { src: MT.IMG.fairyGuide, alt: '나무 요정', id: 'tFairyImg' }), h('p', { class: 'bubble', id: 'tFairy' })]));
     board = new MT.BoardView($('#tboard'), { interactive: false });
     lastPopup = ''; lastFairy = '';
@@ -99,7 +101,9 @@
     if (key === lastPopup) return;
     lastPopup = key;
     var old = $('#tq'); if (old) old.remove();
+    if (!p || !p.draw) { if (drawing) { closeDraw(); toast('선생님이 그림 시간을 마쳤어요.'); } }
     if (!p) return;
+    if (p.draw) { if (!drawing || drawing.qkey !== p.qkey) openDraw(p); return; }
     var s = settingsFrom(state);
     var body = h('div', { class: 'qbody' }, [
       h('div', { class: 'qchips' }, [h('span', { class: 'chip' }, [h('span', { class: 'dot' }), p.mission]), h('span', { class: 'chip soft', text: p.cell + '번 칸' })]),
@@ -133,70 +137,70 @@
     $('#layer').appendChild(back);
   }
 
-  /* ---------- 선물 그리기 ---------- */
-  function openDraw() {
+  /* ---------- 선물 그리기 (칠판에서 그림 문제가 열리면 자동으로) ---------- */
+  function closeDraw() { var b = $('#drawBack'); if (b) b.remove(); if (drawing && drawing.fit) window.removeEventListener('resize', drawing.fit); drawing = null; }
+  function openDraw(p) {
+    closeDraw();
     var PENS = ['#5B4636', '#FF6B6B', '#FF9F43', '#FFD43B', '#51CF66', '#339AF0', '#845EF7', '#F783AC'];
     var SIZES = [7, 16, 30];
-    var pen = PENS[1], size = SIZES[1], erase = false, drawn = false;
+    var pen = PENS[1], size = SIZES[1], erase = false, drawn = false, sent = false;
     var cv = h('canvas', { width: 720, height: 720, 'aria-label': '선물을 그리는 곳' });
     var ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 720, 720);
     var stage = h('div', { class: 'draw-stage' }, [cv]);
-
     var pens = h('div', { class: 'pens', role: 'group', 'aria-label': '색깔' });
-    function paintPens() {
-      pens.innerHTML = '';
-      PENS.forEach(function (c) {
-        pens.appendChild(h('button', { type: 'button', style: 'background:' + c, 'aria-label': '색 ' + c, 'aria-pressed': (!erase && pen === c) ? 'true' : 'false', onclick: function () { pen = c; erase = false; paintPens(); paintEraser(); } }));
-      });
-    }
+    function paintPens() { pens.innerHTML = ''; PENS.forEach(function (c) { pens.appendChild(h('button', { type: 'button', style: 'background:' + c, 'aria-label': '색 ' + c, 'aria-pressed': (!erase && pen === c) ? 'true' : 'false', onclick: function () { pen = c; erase = false; paintPens(); paintEraser(); } })); }); }
     var sizes = h('div', { class: 'sizes', role: 'group', 'aria-label': '굵기' });
-    function paintSizes() {
-      sizes.innerHTML = '';
-      SIZES.forEach(function (sz, i) {
-        var dot = h('span'); dot.style.width = dot.style.height = (8 + i * 8) + 'px';
-        sizes.appendChild(h('button', { type: 'button', 'aria-label': ['가늘게', '보통', '굵게'][i], 'aria-pressed': size === sz ? 'true' : 'false', onclick: function () { size = sz; paintSizes(); } }, [dot]));
-      });
-    }
+    function paintSizes() { sizes.innerHTML = ''; SIZES.forEach(function (sz, i) { var dot = h('span'); dot.style.width = dot.style.height = (8 + i * 8) + 'px'; sizes.appendChild(h('button', { type: 'button', 'aria-label': ['가늘게', '보통', '굵게'][i], 'aria-pressed': size === sz ? 'true' : 'false', onclick: function () { size = sz; paintSizes(); } }, [dot])); }); }
     var eraserBtn = h('button', { class: 'btn', type: 'button', text: '지우개', onclick: function () { erase = !erase; paintPens(); paintEraser(); } });
     function paintEraser() { eraserBtn.setAttribute('aria-pressed', erase ? 'true' : 'false'); eraserBtn.style.outline = erase ? '4px solid #5B4636' : ''; }
     paintPens(); paintSizes(); paintEraser();
-
-    var sendBtn = h('button', { class: 'btn primary big', type: 'button', html: GIFT + '보내기', onclick: send });
+    var sendBtn = h('button', { class: 'btn primary big', type: 'button', html: GIFT + '보내기', onclick: askSend });
     var tools = h('div', { class: 'draw-tools' }, [pens, sizes, eraserBtn,
       h('button', { class: 'btn', type: 'button', text: '다 지우기', onclick: function () { if (!drawn || confirm('그림을 모두 지울까요?')) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 720, 720); drawn = false; } } }),
-      sendBtn,
-      h('button', { class: 'btn', type: 'button', text: '닫기', onclick: function () { if (!drawn || confirm('그리던 그림을 두고 나갈까요?')) back.remove(); } })
-    ]);
-    var sheet = h('div', { class: 'draw-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': '선물 그리기' }, [stage, tools]);
+      sendBtn]);
+    var prompt = h('div', { class: 'draw-prompt' }, [h('span', { text: p.text }), h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.text); } })]);
+    var sheet = h('div', { class: 'draw-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': '선물 그리기' }, [prompt, stage, tools]);
     var back = h('div', { class: 'modal-back', id: 'drawBack' }, [sheet]);
     $('#layer').appendChild(back);
-
     function fit() { var r = stage.getBoundingClientRect(), s = Math.floor(Math.min(r.width, r.height)); cv.style.width = cv.style.height = s + 'px'; }
     requestAnimationFrame(fit); window.addEventListener('resize', fit);
+    drawing = { qkey: p.qkey, fit: fit };
 
     var last = null;
     function pt(e) { var r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * 720 / r.width, (e.clientY - r.top) * 720 / r.height]; }
-    function stroke(a, b) {
-      ctx.strokeStyle = erase ? '#fff' : pen; ctx.lineWidth = erase ? size * 1.8 : size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-    }
+    function stroke(a, b) { ctx.strokeStyle = erase ? '#fff' : pen; ctx.lineWidth = erase ? size * 1.8 : size; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
     cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); last = pt(e); stroke(last, [last[0] + 0.1, last[1]]); if (!erase) drawn = true; });
-    cv.addEventListener('pointermove', function (e) { if (!last) return; var p = pt(e); stroke(last, p); last = p; });
+    cv.addEventListener('pointermove', function (e) { if (!last) return; var q = pt(e); stroke(last, q); last = q; });
     function up() { last = null; }
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 
-    function send() {
+    function overlay(kids) { var o = h('div', { class: 'draw-confirm' }, [h('div', { class: 'draw-confirm-card' }, kids)]); sheet.appendChild(o); return o; }
+    function askSend() {
       if (!drawn) return toast('선물을 먼저 그려 주세요.');
+      var o = overlay([
+        h('p', { class: 'sent', text: sent ? '새 그림으로 바꿔서 보낼까요?' : '이 그림을 보낼까요?' }),
+        h('img', { src: cv.toDataURL('image/jpeg', 0.6), alt: '보낼 그림', class: 'draw-preview' }),
+        h('div', { class: 'qactions', style: 'justify-content:center' }, [
+          h('button', { class: 'btn big primary', type: 'button', text: '보낼래요', onclick: function () { o.remove(); send(); } }),
+          h('button', { class: 'btn big', type: 'button', text: '더 그릴래요', onclick: function () { o.remove(); } })
+        ])
+      ]);
+    }
+    function send() {
       sendBtn.disabled = true;
-      var o = document.createElement('canvas'); o.width = o.height = 360;
-      o.getContext('2d').drawImage(cv, 0, 0, 360, 360);
-      var q = 0.82, url = o.toDataURL('image/jpeg', q);
-      while (url.length > 280000 && q > 0.4) { q -= 0.1; url = o.toDataURL('image/jpeg', q); }
-      MT.Sync.sendGift(room, team, url).then(function () {
-        sheet.innerHTML = '';
-        sheet.style.gridTemplateColumns = '1fr';
-        sheet.appendChild(h('div', { class: 'draw-stage' }, [h('div', { class: 'sent' }, [h('img', { src: MT.IMG.fairyCheer, alt: '', style: 'height:40vh;border-radius:50% 50% 24px 24px;display:block;margin:0 auto 16px' }), '선물을 보냈어요! 칠판을 보세요.'])]));
-        setTimeout(function () { back.remove(); window.removeEventListener('resize', fit); }, 2200);
+      var o2 = document.createElement('canvas'); o2.width = o2.height = 360;
+      o2.getContext('2d').drawImage(cv, 0, 0, 360, 360);
+      var q = 0.82, url = o2.toDataURL('image/jpeg', q);
+      while (url.length > 280000 && q > 0.4) { q -= 0.1; url = o2.toDataURL('image/jpeg', q); }
+      MT.Sync.sendGift(room, team, url, p.qkey).then(function () {
+        sent = true; sendBtn.disabled = false;
+        sendBtn.innerHTML = GIFT + '다시 보내기';
+        var o = overlay([
+          h('img', { src: MT.IMG.fairyCheer, alt: '', style: 'height:34vh;border-radius:50% 50% 24px 24px;display:block;margin:0 auto 12px' }),
+          h('p', { class: 'sent', text: '선물을 보냈어요! 칠판을 보세요.' }),
+          h('p', { class: 'hint', style: 'text-align:center;font-size:18px', text: '고치고 싶으면 다시 그려서 보내면 새 그림으로 바뀌어요.' }),
+          h('div', { class: 'qactions', style: 'justify-content:center' }, [h('button', { class: 'btn big', type: 'button', text: '다시 그리기', onclick: function () { o.remove(); } })])
+        ]);
       }).catch(function (e) { console.warn(e); sendBtn.disabled = false; toast('보내지 못했어요. 인터넷 연결을 확인해 주세요.'); });
     }
   }
@@ -218,7 +222,7 @@
         if (team === null || team >= st.teamCount) showPickTeam(); else showMain();
       } else update();
     });
-    unsubGifts = MT.Sync.watchGifts(room, function (list) { gifts = list.map(function (g) { return { id: g.id, team: g.team, img: g.img }; }); update(); });
+    unsubGifts = MT.Sync.watchGifts(room, function (list) { gifts = list; update(); });
   }
 
   showJoin('연결하는 중이에요…');
