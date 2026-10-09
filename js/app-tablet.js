@@ -21,7 +21,7 @@
   function toast(msg) { var t = h('div', { class: 'toast', role: 'status', text: msg }); document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2600); }
   function speak(text) {
     if (!('speechSynthesis' in window)) return toast('이 기기에서는 읽어 주기를 쓸 수 없어요.');
-    MT.voice.speak(text, { pitch: 1.45, rate: 0.98 });
+    MT.voice.speak(text, { question: true });
   }
   var SPEAK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>';
   var GIFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M2.5 9h19M12 9v11M12 9c-2-4-6-4-6-1.5S10 9 12 9zM12 9c2-4 6-4 6-1.5S14 9 12 9z"/></svg>';
@@ -33,7 +33,7 @@
   function gameFrom(st) {
     var cur = st.popup && st.popup.qkey;
     var hang = gifts.filter(function (g) { return g.qkey !== cur; }).slice(-12);
-    return { positions: st.positions || {}, leaves: st.leaves || [], buds: st.buds || [], cleared: st.cleared || {}, grass: st.grass || 0, bloomed: !!st.bloomed, gifts: hang };
+    return { positions: st.positions || {}, leaves: st.leaves || [], buds: st.buds || [], cleared: st.cleared || {}, grass: st.grass || 0, rainbowN: st.rainbowN || 0, bloomed: !!st.bloomed, gifts: hang };
   }
 
   /* ---------- 화면: 방 들어가기 ---------- */
@@ -52,7 +52,7 @@
     var root = $('#root'); root.innerHTML = '';
     var s = settingsFrom(state), grid = h('div', { class: 'team-pick' });
     for (var t = 0; t < s.teamCount; t++) (function (t) {
-      grid.appendChild(h('button', { type: 'button', onclick: function () { team = t; localStorage.setItem('namugil.tablet.team.' + room, t); showMain(); } }, [
+      grid.appendChild(h('button', { type: 'button', onclick: function () { team = t; sessionStorage.setItem('namu.team.' + room, t); showMain(); } }, [
         h('span', { html: MT.carSVG(s.teams[t].color, s.teams[t].seats, null, String(t + 1)).svg }), s.teams[t].name
       ]));
     })(t);
@@ -65,9 +65,16 @@
     var s = settingsFrom(state);
     var teamBox = h('div', { class: 'tab-team', title: '선생님: 3초 꾹 누르면 모둠을 바꿀 수 있어요' }, [h('span', { class: 'car-ico', id: 'myCar' }), h('span', { id: 'myName' })]);
     // 모둠 바꾸기: 모둠 이름을 3초 꾹 누를 때만
-    var holdTimer = null;
-    teamBox.addEventListener('pointerdown', function () { clearTimeout(holdTimer); holdTimer = setTimeout(function () { if (confirm('모둠을 바꿀까요?')) { team = null; localStorage.removeItem('namugil.tablet.team.' + room); closeDraw(); showPickTeam(); } }, 3000); });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { teamBox.addEventListener(ev, function () { clearTimeout(holdTimer); }); });
+    var holdTimer = null, showTimer = null, bar = h('span', { class: 'hold-bar' });
+    teamBox.appendChild(bar);
+    function stopHold() { clearTimeout(holdTimer); clearTimeout(showTimer); bar.classList.remove('on'); }
+    teamBox.addEventListener('pointerdown', function (e) {
+      e.preventDefault(); stopHold();
+      try { teamBox.setPointerCapture(e.pointerId); } catch (x) {}
+      showTimer = setTimeout(function () { bar.classList.add('on'); }, 1000);
+      holdTimer = setTimeout(function () { stopHold(); if (confirm('모둠을 바꿀까요?')) { team = null; sessionStorage.removeItem('namu.team.' + room); closeDraw(); showPickTeam(); } }, 3000);
+    });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { teamBox.addEventListener(ev, stopHold); });
     teamBox.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     var top = h('header', { class: 'tab-top' }, [teamBox, h('span', { class: 'class-chip', text: state.className || '' })]);
     var bwrap = h('main', { class: 'tab-board', 'aria-label': '게임판' }, [h('div', { id: 'tboard' })]);
@@ -216,7 +223,7 @@
       state = st;
       if (first) {
         first = false;
-        var saved = localStorage.getItem('namugil.tablet.team.' + room);
+        var saved = sessionStorage.getItem('namu.team.' + room);
         team = saved !== null ? +saved : null;
         wasBloomed = !!st.bloomed;
         if (team === null || team >= st.teamCount) showPickTeam(); else showMain();

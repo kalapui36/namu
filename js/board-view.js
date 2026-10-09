@@ -41,6 +41,25 @@ window.MT = window.MT || {};
   MT.budSVG = function () {
     return '<svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20 6 C30 14 31 28 20 34 C9 28 10 14 20 6 Z" fill="#FFB3C7" stroke="#E07C9C" stroke-width="2"/><path d="M20 34 C14 33 10 29 9 25 C13 27 17 28 20 30 C23 28 27 27 31 25 C30 29 26 33 20 34 Z" fill="#8CC97A" stroke="#5E9E4E" stroke-width="1.6"/><path d="M20 34 V45" stroke="#5E9E4E" stroke-width="2.4" stroke-linecap="round"/></svg>';
   };
+  MT.wildFlowerSVG = function (tone) {
+    var c = [['#FFC0D2', '#E9849F'], ['#FFF0A0', '#E2B13C'], ['#D9C8FF', '#A98BE3']][tone];
+    var p = '';
+    for (var i = 0; i < 5; i++) p += '<ellipse cx="20" cy="11" rx="5" ry="7" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="1.4" transform="rotate(' + (i * 72) + ' 20 18)"/>';
+    return '<svg viewBox="0 0 40 52" aria-hidden="true"><path d="M20 22 C19 32 21 40 20 50" stroke="#5E9E4E" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M20 38 C14 36 11 32 10 28 C15 29 18 32 20 36" fill="#8CC97A"/>' + p + '<circle cx="20" cy="18" r="4" fill="#FFD86B"/></svg>';
+  };
+  MT.butterflySVG = function (tone) {
+    var c = [['#FFC6DA', '#F08BB0'], ['#BFE3FF', '#6FB6E3'], ['#FFE59A', '#E9B93A']][tone];
+    return '<svg viewBox="0 0 60 44" aria-hidden="true"><g class="wing-l"><path d="M29 22 C20 4 4 2 5 14 C6 22 16 24 29 22 Z" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="2"/><path d="M29 23 C20 26 10 34 16 39 C21 43 27 34 29 23 Z" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="2"/></g><g class="wing-r"><path d="M31 22 C40 4 56 2 55 14 C54 22 44 24 31 22 Z" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="2"/><path d="M31 23 C40 26 50 34 44 39 C39 43 33 34 31 23 Z" fill="' + c[0] + '" stroke="' + c[1] + '" stroke-width="2"/></g><ellipse cx="30" cy="23" rx="2.6" ry="10" fill="#6B5446"/><path d="M29 13 C27 8 25 6 23 5 M31 13 C33 8 35 6 37 5" stroke="#6B5446" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>';
+  };
+  MT.birdSVG = function (tone) {
+    var body = tone ? '#BFE3FF' : '#FFD3A8', edge = tone ? '#6FB6E3' : '#E89A5C';
+    return '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="30" rx="22" ry="18" fill="' + body + '" stroke="' + edge + '" stroke-width="2.4"/><path d="M14 30 C6 26 4 34 10 38 C14 40 18 36 18 34" fill="' + body + '" stroke="' + edge + '" stroke-width="2.4"/><path d="M30 30 C26 38 34 42 40 36" fill="#fff" opacity=".7"/><circle cx="42" cy="24" r="3" fill="#4A3B2F"/><circle cx="43" cy="23" r="1" fill="#fff"/><path d="M52 27 L60 29 L52 32 Z" fill="#FFB648" stroke="#E2902A" stroke-width="1.4" stroke-linejoin="round"/><ellipse cx="44" cy="31" rx="3.4" ry="2" fill="#FFB3C7" opacity=".8"/><path d="M28 47 V53 M36 47 V53" stroke="#E2902A" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  };
+  MT.rainbowSVG = function () {
+    var cols = ['#FFC6CE', '#FFDDB8', '#FFF2AC', '#CDF1C4', '#C4E4FB', '#DECCF9'], a = '';
+    cols.forEach(function (c, i) { var r = 290 - i * 16; a += '<path d="M' + (300 - r) + ' 300 A' + r + ' ' + r + ' 0 0 1 ' + (300 + r) + ' 300" fill="none" stroke="' + c + '" stroke-width="17"/>'; });
+    return '<svg viewBox="0 0 600 300" preserveAspectRatio="none" aria-hidden="true">' + a + '</svg>';
+  };
   MT.flowerSVG = function (tone) {
     var c = tone === 1 ? ['#FFD3A8', '#F0A867'] : tone === 2 ? ['#E3D0FF', '#B796EE'] : ['#FFC0D2', '#E9849F'];
     var p = '';
@@ -60,11 +79,15 @@ window.MT = window.MT || {};
     this.bgBase.style.backgroundImage = 'url("' + MT.IMG.bgBase + '")';
     this.bgGrass.style.backgroundImage = 'url("' + MT.IMG.bgGrass + '")';
     this.center = el('div', 'bv-center', root);
+    this.arc = el('div', 'bv-arc', this.center);
+    this.field = el('div', 'bv-field', this.center);
     this.gifts = el('div', 'bv-gifts', this.center);
     this.tree = el('div', 'bv-tree', this.center);
     var timg = el('img', 'bv-tree-img', this.tree); timg.src = MT.IMG.tree; timg.alt = '함께 키우는 나무'; timg.draggable = false;
     this.leafLayer = el('div', 'bv-leaves', this.tree);
     this.flowerLayer = el('div', 'bv-flowers', this.tree);
+    this.birdLayer = el('div', 'bv-birds', this.tree);
+    this.flies = el('div', 'bv-flies', this.center);
     this.cells = el('div', 'bv-cells', root);
     this.cars = el('div', 'bv-cars', root);
     this.cellEls = [];
@@ -144,8 +167,10 @@ window.MT = window.MT || {};
     var sig = JSON.stringify([N, settings.cellColors, settings.missions, game.cleared, g.W, g.H]);
     if (force || sig !== this.cellSig) { this.cellSig = sig; this.drawCells(settings, game); }
 
-    // 풀(무지개 칸)
-    var p = Math.max(0, Math.min(1, (game.grass || 0) / 6));
+    // 무지개 칸: 잔디 → 풀꽃 → 나비 → 무지개 → 새
+    var n = game.rainbowN || 0;
+    var p = n ? Math.min(1, 0.45 + 0.18 * (n - 1)) : 0;
+    this.drawRainbowStuff(n, force);
     this.bgGrass.style.setProperty('--p', p);
     this.bgGrass.classList.toggle('on', p > 0);
 
@@ -154,6 +179,51 @@ window.MT = window.MT || {};
     this.drawGifts(game, force);
     this.drawCars(settings, game, avatars, force);
     this.root.classList.toggle('bloomed', !!game.bloomed);
+  };
+
+  BoardView.prototype.drawRainbowStuff = function (n, force) {
+    var g = this.geo, c = g.center, key = n + '|' + Math.round(c.w) + '|' + Math.round(c.h);
+    if (!force && key === this._rbKey) return;
+    var grow = this._rbKey !== undefined && !force; this._rbKey = key;
+    var prevN = this._rbN || 0; this._rbN = n;
+    var r = MT.rng(7);
+    // 풀꽃
+    var nf = n >= 2 ? Math.min(25, 4 + Math.max(0, n - 5) * 3) : 0;
+    this.field.innerHTML = '';
+    for (var i = 0; i < nf; i++) {
+      var x = 0.04 + 0.92 * r(), y = 0.86 + 0.11 * r();
+      var f = el('div', 'bv-wild' + (grow && i >= this._nf ? ' pop' : ''), this.field);
+      f.innerHTML = MT.wildFlowerSVG(i % 3);
+      f.style.left = (x * 100) + '%'; f.style.top = (y * 100) + '%'; f.style.width = (g.cs * (0.26 + 0.1 * r())) + 'px';
+    }
+    this._nf = nf;
+    // 무지개
+    this.arc.classList.toggle('on', n >= 4);
+    if (!this.arc.firstChild) this.arc.innerHTML = MT.rainbowSVG();
+    // 나비
+    var nb = n >= 3 ? Math.min(6, 1 + Math.max(0, n - 5)) : 0;
+    if (this.flies.childNodes.length !== nb || force) {
+      this.flies.innerHTML = '';
+      for (var b = 0; b < nb; b++) {
+        var bf = el('div', 'bv-fly f' + (b % 3), this.flies);
+        bf.innerHTML = '<div class="bv-fly-in">' + MT.butterflySVG(b % 3) + '</div>';
+        bf.style.width = (g.cs * 0.42) + 'px';
+        bf.style.animationDelay = (-b * 2.3) + 's';
+      }
+    }
+    // 새
+    var nbird = n >= 8 ? 2 : n >= 5 ? 1 : 0;
+    if (this.birdLayer.childNodes.length !== nbird || force) {
+      this.birdLayer.innerHTML = '';
+      [[0.78, 0.16], [0.22, 0.22]].slice(0, nbird).forEach(function (pos, i) {
+        var best = null, bd = 1e9;
+        MT.LEAF_ANCHORS.forEach(function (a) { var d = Math.hypot(a[0] - pos[0], a[1] - pos[1]); if (d < bd) { bd = d; best = a; } });
+        var bd2 = el('div', 'bv-bird' + (grow && prevN < (i ? 8 : 5) ? ' pop' : ''), this.birdLayer);
+        bd2.innerHTML = MT.birdSVG(i);
+        bd2.style.left = (best[0] * 100) + '%'; bd2.style.top = (best[1] * 100) + '%'; bd2.style.width = (g.tree.w * 0.14) + 'px';
+        if (i) bd2.style.transform = 'translate(-50%,-85%) scaleX(-1)';
+      }, this);
+    }
   };
 
   BoardView.prototype.drawCells = function (settings, game) {

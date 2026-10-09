@@ -145,21 +145,30 @@ window.MT = window.MT || {};
 
   // 요정 목소리: 한국어 여자 목소리를 우선으로, 높고 발랄하게
   MT.voice = {
+    isEdge: /Edg\//.test(navigator.userAgent),
     pick: function () {
       if (!('speechSynthesis' in window)) return null;
       var ko = speechSynthesis.getVoices().filter(function (v) { return /^ko/i.test(v.lang); });
-      var prefer = [/SunHi/i, /Yuna/i, /Google.*(한국|Korean)/i, /Heami/i, /female|여성|여자/i];
+      // 엣지: 자연스러운 온라인 목소리, 크롬: 구글 한국어 목소리를 먼저
+      var prefer = [/SunHi.*Natural|SunHi.*Online/i, /Natural|Online/i, /Google/i, /Yuna/i, /SunHi/i, /Heami/i];
       for (var i = 0; i < prefer.length; i++) { var f = ko.filter(function (v) { return prefer[i].test(v.name); })[0]; if (f) return f; }
       return ko[0] || null;
+    },
+    // 목소리 종류마다 견딜 수 있는 만큼만 높이기 (기본 윈도우 목소리는 높이면 깨짐)
+    tune: function (v, isQuestion) {
+      var n = v ? v.name : '';
+      if (/Natural|Online/i.test(n)) return { pitch: isQuestion ? 1.25 : 1.35, rate: isQuestion ? 0.95 : 1.02 };
+      if (/Google/i.test(n)) return { pitch: isQuestion ? 1.12 : 1.2, rate: isQuestion ? 0.95 : 1.0 };
+      return { pitch: 1.0, rate: isQuestion ? 0.92 : 0.98 };
     },
     speak: function (text, opts) {
       if (!('speechSynthesis' in window)) return false;
       speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(MT.readable(text));
       u.lang = 'ko-KR';
-      u.pitch = (opts && opts.pitch) || 1.55;
-      u.rate = (opts && opts.rate) || 1.05;
       var v = MT.voice.pick(); if (v) u.voice = v;
+      var t = MT.voice.tune(v, !!(opts && opts.question));
+      u.pitch = t.pitch; u.rate = t.rate;
       speechSynthesis.speak(u);
       return true;
     }
