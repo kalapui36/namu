@@ -55,6 +55,21 @@ window.MT = window.MT || {};
     var body = tone ? '#BFE3FF' : '#FFD3A8', edge = tone ? '#6FB6E3' : '#E89A5C';
     return '<svg viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="30" rx="22" ry="18" fill="' + body + '" stroke="' + edge + '" stroke-width="2.4"/><path d="M14 30 C6 26 4 34 10 38 C14 40 18 36 18 34" fill="' + body + '" stroke="' + edge + '" stroke-width="2.4"/><path d="M30 30 C26 38 34 42 40 36" fill="#fff" opacity=".7"/><circle cx="42" cy="24" r="3" fill="#4A3B2F"/><circle cx="43" cy="23" r="1" fill="#fff"/><path d="M52 27 L60 29 L52 32 Z" fill="#FFB648" stroke="#E2902A" stroke-width="1.4" stroke-linejoin="round"/><ellipse cx="44" cy="31" rx="3.4" ry="2" fill="#FFB3C7" opacity=".8"/><path d="M28 47 V53 M36 47 V53" stroke="#E2902A" stroke-width="2.4" stroke-linecap="round"/></svg>';
   };
+  MT.squirrelSVG = function () {
+    return '<svg viewBox="0 0 80 72" aria-hidden="true">' +
+      '<path class="sq-tail" d="M26 62 C6 60 2 40 10 26 C16 14 30 10 34 22 C37 32 26 34 24 42 C22 50 30 56 26 62 Z" fill="#E0A26B" stroke="#B5743D" stroke-width="2.4" stroke-linejoin="round"/>' +
+      '<path d="M16 30 C20 22 28 20 30 26" fill="none" stroke="#F2C79C" stroke-width="3" stroke-linecap="round"/>' +
+      '<ellipse cx="44" cy="50" rx="15" ry="16" fill="#E0A26B" stroke="#B5743D" stroke-width="2.4"/>' +
+      '<ellipse cx="46" cy="54" rx="8" ry="10" fill="#FBE3C6"/>' +
+      '<circle cx="54" cy="30" r="13" fill="#E0A26B" stroke="#B5743D" stroke-width="2.4"/>' +
+      '<path d="M47 20 L46 10 L53 17 Z M58 18 L61 9 L64 18 Z" fill="#E0A26B" stroke="#B5743D" stroke-width="2" stroke-linejoin="round"/>' +
+      '<ellipse cx="60" cy="34" rx="6" ry="5" fill="#FBE3C6"/>' +
+      '<circle cx="57" cy="27" r="2.6" fill="#4A3B2F"/><circle cx="57.8" cy="26.2" r=".9" fill="#fff"/>' +
+      '<circle cx="65" cy="32" r="1.8" fill="#6B4A36"/>' +
+      '<ellipse cx="51" cy="35" rx="3.2" ry="2" fill="#FFB3C7" opacity=".85"/>' +
+      '<ellipse cx="56" cy="47" rx="5" ry="3.4" fill="#B98552" stroke="#8F6037" stroke-width="1.6"/>' +
+      '<path d="M37 64 h8 M48 64 h8" stroke="#B5743D" stroke-width="3" stroke-linecap="round"/></svg>';
+  };
   MT.rainbowSVG = function () {
     var cols = ['#FFC6CE', '#FFDDB8', '#FFF2AC', '#CDF1C4', '#C4E4FB', '#DECCF9'], a = '';
     cols.forEach(function (c, i) { var r = 290 - i * 16; a += '<path d="M' + (300 - r) + ' 300 A' + r + ' ' + r + ' 0 0 1 ' + (300 + r) + ' 300" fill="none" stroke="' + c + '" stroke-width="17"/>'; });
@@ -78,6 +93,8 @@ window.MT = window.MT || {};
     this.bgGrass = el('div', 'bv-bg bv-bg-grass', root);
     this.bgBase.style.backgroundImage = 'url("' + MT.IMG.bgBase + '")';
     this.bgGrass.style.backgroundImage = 'url("' + MT.IMG.bgGrass + '")';
+    this.sun = el('div', 'bv-sun', root);
+    el('div', 'bv-sun-rays', this.sun);
     this.center = el('div', 'bv-center', root);
     this.arc = el('div', 'bv-arc', this.center);
     this.field = el('div', 'bv-field', this.center);
@@ -170,7 +187,7 @@ window.MT = window.MT || {};
     // 무지개 칸: 잔디 → 풀꽃 → 나비 → 무지개 → 새
     var n = game.rainbowN || 0;
     var p = n ? Math.min(1, 0.45 + 0.18 * (n - 1)) : 0;
-    this.drawRainbowStuff(n, force);
+    this.drawRainbowStuff(n, force, p);
     this.bgGrass.style.setProperty('--p', p);
     this.bgGrass.classList.toggle('on', p > 0);
 
@@ -181,27 +198,29 @@ window.MT = window.MT || {};
     this.root.classList.toggle('bloomed', !!game.bloomed);
   };
 
-  BoardView.prototype.drawRainbowStuff = function (n, force) {
+  BoardView.prototype.drawRainbowStuff = function (n, force, gp) {
     var g = this.geo, c = g.center, key = n + '|' + Math.round(c.w) + '|' + Math.round(c.h);
     if (!force && key === this._rbKey) return;
     var grow = this._rbKey !== undefined && !force; this._rbKey = key;
     var prevN = this._rbN || 0; this._rbN = n;
     var r = MT.rng(7);
     // 풀꽃
-    var nf = n >= 2 ? Math.min(25, 4 + Math.max(0, n - 5) * 3) : 0;
+    var nf = n >= 2 ? Math.min(25, 4 + Math.max(0, n - 6) * 3) : 0;
     this.field.innerHTML = '';
+    // 잔디가 보이는 땅에만: 잔디 그림의 풀밭 높이와 지금 자란 만큼 중 더 아래부터, 칸 줄 바로 위까지
+    var bottom = c.y + c.h - 2, top = Math.max(g.H * 0.8, g.H * (1 - (gp || 0)) + g.H * 0.04);
+    if (top > bottom - g.H * 0.03) top = bottom - g.H * 0.03;
     for (var i = 0; i < nf; i++) {
-      var x = 0.04 + 0.92 * r(), y = 0.86 + 0.11 * r();
+      var x = 0.03 + 0.94 * r(), y = (top + (bottom - top) * r() - c.y) / c.h;
       var f = el('div', 'bv-wild' + (grow && i >= this._nf ? ' pop' : ''), this.field);
       f.innerHTML = MT.wildFlowerSVG(i % 3);
-      f.style.left = (x * 100) + '%'; f.style.top = (y * 100) + '%'; f.style.width = (g.cs * (0.26 + 0.1 * r())) + 'px';
+      f.style.left = (x * 100) + '%'; f.style.top = (y * 100) + '%'; f.style.width = (g.cs * (0.36 + 0.12 * r())) + 'px';
     }
     this._nf = nf;
-    // 무지개
-    this.arc.classList.toggle('on', n >= 4);
-    if (!this.arc.firstChild) this.arc.innerHTML = MT.rainbowSVG();
+    // 햇살
+    this.sun.classList.toggle('on', n >= 4);
     // 나비
-    var nb = n >= 3 ? Math.min(6, 1 + Math.max(0, n - 5)) : 0;
+    var nb = n >= 3 ? Math.min(6, 1 + Math.max(0, n - 6)) : 0;
     if (this.flies.childNodes.length !== nb || force) {
       this.flies.innerHTML = '';
       for (var b = 0; b < nb; b++) {
@@ -211,17 +230,23 @@ window.MT = window.MT || {};
         bf.style.animationDelay = (-b * 2.3) + 's';
       }
     }
-    // 새
-    var nbird = n >= 8 ? 2 : n >= 5 ? 1 : 0;
-    if (this.birdLayer.childNodes.length !== nbird || force) {
+    // 다람쥐(5번째)와 새(6번째, 9번째)
+    var critters = [];
+    if (n >= 5) critters.push({ kind: 'squirrel', at: [0.3, 0.44], from: 5 });
+    if (n >= 6) critters.push({ kind: 'bird0', at: [0.78, 0.16], from: 6 });
+    if (n >= 9) critters.push({ kind: 'bird1', at: [0.22, 0.22], from: 9, flip: true });
+    var ckey = critters.map(function (k) { return k.kind; }).join(',');
+    if (this._ckey !== ckey || force) {
+      this._ckey = ckey;
       this.birdLayer.innerHTML = '';
-      [[0.78, 0.16], [0.22, 0.22]].slice(0, nbird).forEach(function (pos, i) {
+      critters.forEach(function (k) {
         var best = null, bd = 1e9;
-        MT.LEAF_ANCHORS.forEach(function (a) { var d = Math.hypot(a[0] - pos[0], a[1] - pos[1]); if (d < bd) { bd = d; best = a; } });
-        var bd2 = el('div', 'bv-bird' + (grow && prevN < (i ? 8 : 5) ? ' pop' : ''), this.birdLayer);
-        bd2.innerHTML = MT.birdSVG(i);
-        bd2.style.left = (best[0] * 100) + '%'; bd2.style.top = (best[1] * 100) + '%'; bd2.style.width = (g.tree.w * 0.14) + 'px';
-        if (i) bd2.style.transform = 'translate(-50%,-85%) scaleX(-1)';
+        MT.LEAF_ANCHORS.forEach(function (a) { var d = Math.hypot(a[0] - k.at[0], a[1] - k.at[1]); if (d < bd) { bd = d; best = a; } });
+        var e = el('div', (k.kind === 'squirrel' ? 'bv-squirrel' : 'bv-bird') + (grow && prevN < k.from ? ' pop' : ''), this.birdLayer);
+        e.innerHTML = k.kind === 'squirrel' ? MT.squirrelSVG() : MT.birdSVG(k.kind === 'bird1' ? 1 : 0);
+        e.style.left = (best[0] * 100) + '%'; e.style.top = (best[1] * 100) + '%';
+        e.style.width = (g.tree.w * (k.kind === 'squirrel' ? 0.17 : 0.14)) + 'px';
+        if (k.flip) e.style.transform = 'translate(-50%,-85%) scaleX(-1)';
       }, this);
     }
   };
@@ -454,4 +479,25 @@ window.MT = window.MT || {};
   };
 
   MT.BoardView = BoardView;
+
+  // 게임 안 확인 창 (브라우저 기본 확인 창 대신)
+  MT.ask = function (message, yes, no, opts) {
+    return new Promise(function (resolve) {
+      var back = el('div', 'modal-back ask-back');
+      var card = el('div', 'ask-card', back);
+      card.setAttribute('role', 'alertdialog'); card.setAttribute('aria-modal', 'true');
+      if (opts && opts.fairy) { var im = el('img', 'ask-fairy', card); im.src = MT.IMG.fairyGuide; im.alt = '나무 요정'; }
+      var msg = el('p', 'ask-msg', card); msg.textContent = message;
+      var row = el('div', 'qactions', card); row.style.justifyContent = 'center';
+      var y = el('button', 'btn ' + (opts && opts.fairy ? 'big ' : '') + ((opts && opts.danger) ? 'berry' : 'primary'), row); y.type = 'button'; y.textContent = yes || '네';
+      var n = el('button', 'btn ' + (opts && opts.fairy ? 'big' : ''), row); n.type = 'button'; n.textContent = no || '아니요';
+      function done(v) { back.remove(); document.removeEventListener('keydown', key, true); resolve(v); }
+      function key(e) { if (e.key === 'Escape') { e.stopPropagation(); done(false); } }
+      y.addEventListener('click', function () { done(true); });
+      n.addEventListener('click', function () { done(false); });
+      document.addEventListener('keydown', key, true);
+      (document.getElementById('layer') || document.body).appendChild(back);
+      y.focus();
+    });
+  };
 })(window.MT);

@@ -72,7 +72,7 @@
       e.preventDefault(); stopHold();
       try { teamBox.setPointerCapture(e.pointerId); } catch (x) {}
       showTimer = setTimeout(function () { bar.classList.add('on'); }, 1000);
-      holdTimer = setTimeout(function () { stopHold(); if (confirm('모둠을 바꿀까요?')) { team = null; sessionStorage.removeItem('namu.team.' + room); closeDraw(); showPickTeam(); } }, 3000);
+      holdTimer = setTimeout(function () { stopHold(); MT.ask('모둠을 바꿀까요?', '바꾸기', '취소').then(function (ok) { if (ok) { team = null; sessionStorage.removeItem('namu.team.' + room); closeDraw(); showPickTeam(); } }); }, 3000);
     });
     ['pointerup', 'pointercancel'].forEach(function (ev) { teamBox.addEventListener(ev, stopHold); });
     teamBox.addEventListener('contextmenu', function (e) { e.preventDefault(); });
@@ -163,7 +163,7 @@
     paintPens(); paintSizes(); paintEraser();
     var sendBtn = h('button', { class: 'btn primary big', type: 'button', html: GIFT + '보내기', onclick: askSend });
     var tools = h('div', { class: 'draw-tools' }, [pens, sizes, eraserBtn,
-      h('button', { class: 'btn', type: 'button', text: '다 지우기', onclick: function () { if (!drawn || confirm('그림을 모두 지울까요?')) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 720, 720); drawn = false; } } }),
+      h('button', { class: 'btn', type: 'button', text: '다 지우기', onclick: function () { function wipe() { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 720, 720); drawn = false; } if (!drawn) wipe(); else MT.ask('그림을 모두 지울까요?', '지우기', '그대로 두기').then(function (ok) { if (ok) wipe(); }); } }),
       sendBtn]);
     var prompt = h('div', { class: 'draw-prompt' }, [h('span', { text: p.text }), h('button', { class: 'btn round', type: 'button', 'aria-label': '문제 읽어 주기', html: SPEAK, onclick: function () { speak(p.text); } })]);
     var sheet = h('div', { class: 'draw-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': '선물 그리기' }, [prompt, stage, tools]);

@@ -137,12 +137,20 @@ window.MT = window.MT || {};
     if (n < 100) { var t = Math.floor(n / 10), o = n % 10; return (t > 1 ? d[t] : '') + '십' + d[o]; }
     return String(n);
   };
+  // 개수 세는 말은 우리말 숫자로: "6장" → "여섯 장", "1개" → "한 개"
+  MT.native = function (n) {
+    n = +n;
+    var one = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉'], ten = ['', '열', '스물', '서른', '마흔', '쉰', '예순', '일흔', '여든', '아흔'];
+    if (n <= 0 || n >= 100) return String(n);
+    if (n === 20) return '스무';
+    return ten[Math.floor(n / 10)] + one[n % 10];
+  };
   MT.readable = function (text) {
     return String(text)
       .replace(/(\d+)\s*번\s*칸/g, function (m, n) { return MT.sino(n) + '번 칸'; })
-      .replace(/문제\s*(\d+)/g, function (m, n) { return '문제 ' + MT.sino(n); });
+      .replace(/문제\s*(\d+)/g, function (m, n) { return '문제 ' + MT.sino(n); })
+      .replace(/(\d+)\s*(장|개|마리|명|송이|그루)/g, function (m, n, u) { return MT.native(n) + ' ' + u; });
   };
-
   // 요정 목소리: 한국어 여자 목소리를 우선으로, 높고 발랄하게
   MT.voice = {
     isEdge: /Edg\//.test(navigator.userAgent),
@@ -154,22 +162,24 @@ window.MT = window.MT || {};
       for (var i = 0; i < prefer.length; i++) { var f = ko.filter(function (v) { return prefer[i].test(v.name); })[0]; if (f) return f; }
       return ko[0] || null;
     },
-    // 목소리 종류마다 견딜 수 있는 만큼만 높이기 (기본 윈도우 목소리는 높이면 깨짐)
+    // 크롬: 높이·빠르기를 바꾸면 지직거려서 원래 그대로
+    // 엣지: 자연스러운 목소리라 높여도 깨지지 않아서 맑고 발랄하게
     tune: function (v, isQuestion) {
       var n = v ? v.name : '';
-      if (/Natural|Online/i.test(n)) return { pitch: isQuestion ? 1.25 : 1.35, rate: isQuestion ? 0.95 : 1.02 };
-      if (/Google/i.test(n)) return { pitch: isQuestion ? 1.12 : 1.2, rate: isQuestion ? 0.95 : 1.0 };
-      return { pitch: 1.0, rate: isQuestion ? 0.92 : 0.98 };
+      if (MT.voice.isEdge && /Natural|Online/i.test(n)) return { pitch: isQuestion ? 1.45 : 1.55, rate: isQuestion ? 1.0 : 1.05 };
+      return { pitch: 1, rate: 1 };
     },
     speak: function (text, opts) {
       if (!('speechSynthesis' in window)) return false;
+      var wasBusy = speechSynthesis.speaking || speechSynthesis.pending;
       speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(MT.readable(text));
       u.lang = 'ko-KR';
       var v = MT.voice.pick(); if (v) u.voice = v;
       var t = MT.voice.tune(v, !!(opts && opts.question));
       u.pitch = t.pitch; u.rate = t.rate;
-      speechSynthesis.speak(u);
+      // 이전 소리를 끊자마자 바로 읽으면 크롬에서 잡음이 나서 아주 짧게 쉬었다가
+      if (wasBusy) setTimeout(function () { speechSynthesis.speak(u); }, 150); else speechSynthesis.speak(u);
       return true;
     }
   };

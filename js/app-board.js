@@ -27,7 +27,7 @@
     (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
     return e;
   }
-  var GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>';
+  var GEAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
   var E = null;            // 설정에서 고치는 문제 세트 (없으면 지금 반의 세트)
   var ICON = {
     speak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 9a4 4 0 0 1 0 6"/><path d="M19 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
@@ -119,7 +119,7 @@
   }
 
   function renderTeams() {
-    $('#classTree').textContent = G.leaves.length ? '우리 반 나무에 나뭇잎이 ' + G.leaves.length + '장 자랐어요' + (G.buds.length ? ', 꽃봉오리도 ' + G.buds.length + '개' : '') + '.' : '우리 반 나무가 나뭇잎을 기다리고 있어요.';
+    $('#classTree').textContent = G.leaves.length ? '우리 반 나무에 나뭇잎이 ' + G.leaves.length + '장 자랐어요' + (G.buds.length ? ', 꽃봉오리도 ' + G.buds.length + '개 자랐어요' : '') + '.' : '우리 반 나무가 나뭇잎을 기다리고 있어요.';
     var box = $('#teamList'); box.innerHTML = '';
     for (var t = 0; t < S.teamCount; t++) {
       var faces = A.filter(function (a) { return a.team === t; }).map(function (a) { return a.img; });
@@ -156,9 +156,10 @@
       var line = n === 1 ? '와, 무지개 칸이야! 땅에 초록 잔디가 자라났어!'
         : n === 2 ? '무지개 칸이야! 잔디밭에 예쁜 풀꽃이 피었어!'
         : n === 3 ? '무지개 칸이야! 팔랑팔랑, 나비가 놀러 왔어!'
-        : n === 4 ? '무지개 칸이야! 우리 나무 위에 무지개가 떴어!'
-        : n === 5 ? '무지개 칸이야! 짹짹, 작은 새가 나무에 앉았어!'
-        : n === 8 ? '무지개 칸이야! 새 친구가 한 마리 더 왔어!'
+        : n === 4 ? '무지개 칸이야! 따뜻한 햇살이 우리 나무를 비춰 줘!'
+        : n === 5 ? '무지개 칸이야! 다람쥐가 나무에 놀러 왔어!'
+        : n === 6 ? '무지개 칸이야! 짹짹, 작은 새가 나무에 앉았어!'
+        : n === 9 ? '무지개 칸이야! 새 친구가 한 마리 더 왔어!'
         : '무지개 칸이야! 풀꽃이 더 피고 나비도 또 왔어!';
       setFairy(line + ' ' + cell + '번 칸을 눌러 미션도 해 보자.', 'cheer');
       MT.sfx.rainbow();
@@ -210,7 +211,7 @@
       var team = S.teams[g.team] || { color: '#ccc', name: '' };
       var tape = h('span', { class: 'tape' }); tape.style.background = team.color;
       box.appendChild(h('button', { type: 'button', title: '눌러서 숨기기', onclick: function () {
-        if (confirm('이 그림을 숨길까요? 숨기면 다시 볼 수 없어요.')) Sy.deleteGift(C.room, g.id).catch(function () { toast('숨기지 못했어요.'); });
+        MT.ask('이 그림을 숨길까요? 숨기면 다시 볼 수 없어요.', '숨기기', '그대로 두기', { danger: true }).then(function (ok) { if (ok) Sy.deleteGift(C.room, g.id).catch(function () { toast('숨기지 못했어요.'); }); });
       } }, [tape, h('img', { src: g.img, alt: team.name + ' 선물 그림' }), team.name]));
     });
   }
@@ -324,12 +325,15 @@
   }
 
   function resetGame() {
-    if (!confirm('자동차 위치, 나뭇잎, 꽃, 풀, 선물 그림을 모두 비우고 처음부터 할까요?\n(반 설정, 문제, 아이들 그림은 그대로 남아요)')) return;
-    G = MT.defaultGame(); C.game = G;
-    setFairy(MT.FAIRY_LINES.hello, 'guide');
-    popup = null;
-    if (syncOn) Sy.clearGifts(C.room).catch(function () {});
-    saveClass(); render(true);
+    MT.ask('자동차 위치, 나뭇잎, 꽃, 풀, 선물 그림을 모두 비우고 처음부터 할까요?\n(반 설정, 문제, 아이들 그림은 그대로 남아요)', '처음부터 하기', '취소', { danger: true }).then(function (ok) {
+      if (!ok) return;
+      G = MT.defaultGame(); C.game = G;
+      setFairy(MT.FAIRY_LINES.hello, 'guide');
+      popup = null;
+      if (syncOn) Sy.clearGifts(C.room).catch(function () {});
+      saveClass(); render(true);
+      showHowto();
+    });
   }
 
   /* ---------- 게임 접속하기 ---------- */
@@ -367,10 +371,10 @@
     var back = h('div', { class: 'modal-back', id: 'howBack' }, [h('div', { class: 'howto', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'howTitle' }, [
       h('img', { src: MT.IMG.fairyGuide, alt: '나무 요정' }),
       h('div', null, [
-        h('h2', { id: 'howTitle', text: '이렇게 놀아요' }),
+        h('div', { class: 'how-head' }, [h('h2', { id: 'howTitle', text: '이렇게 놀아요' }),
+          h('button', { class: 'btn round icon', type: 'button', 'aria-label': '요정이 읽어 주기', title: '요정이 읽어 주기', html: ICON.speak, onclick: function () { speak('안녕! 나는 나무 요정이야. ' + HOWTO.join(' ')); } })]),
         h('ol', null, HOWTO.map(function (t) { return h('li', { text: t }); })),
         h('div', { class: 'qactions' }, [
-          h('button', { class: 'btn big sky', type: 'button', html: ICON.speak + '요정이 읽어 주기', onclick: function () { speak('안녕! 나는 나무 요정이야. ' + HOWTO.join(' ')); } }),
           h('button', { class: 'btn big primary', type: 'button', text: '시작하기', onclick: function () { back.remove(); if ('speechSynthesis' in window) speechSynthesis.cancel(); } })
         ])
       ])
@@ -468,7 +472,7 @@
   function openSettings(tab) {
     curTab = tab || curTab;
     if (!C && curTab !== 'manage' && !(curTab === 'questions' && E)) curTab = 'manage';
-    var old = $('#setBack'); if (old) old.remove();
+    var old = $('#setBack'), again = !!old; if (old) old.remove();
     var tabs = C ? [['class', '이 반'], ['teams', '모둠과 그림'], ['questions', '문제 세트'], ['manage', '반과 세트 관리'], ['connect', '태블릿 연결']]
       : [['manage', '반과 세트 관리']].concat(E ? [['questions', '문제 세트']] : []);
     var tabBar = h('div', { class: 'tabs', role: 'tablist' });
@@ -477,7 +481,7 @@
     var sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': '설정' }, [
       h('div', { class: 'sheet-head' }, [h('h2', { text: '설정' }), tabBar, h('button', { class: 'btn round', type: 'button', 'aria-label': '설정 닫기', html: ICON.close, onclick: closeSettings })]), bodyEl
     ]);
-    $('#layer').appendChild(h('div', { class: 'modal-back', id: 'setBack' }, [sheet]));
+    $('#layer').appendChild(h('div', { class: 'modal-back' + (again ? ' still' : ''), id: 'setBack' }, [sheet]));
     ({ class: tabClass, teams: tabTeams, questions: tabQuestions, manage: tabManage, connect: tabConnect })[curTab](bodyEl);
   }
   function closeSettings() {
@@ -518,8 +522,6 @@
     var sx = h('input', { type: 'checkbox', id: 'sfxOn', style: 'width:28px;height:28px', onchange: function (e) { MT.sfx.set(e.target.checked); } });
     sx.checked = MT.sfx.isOn();
     el.appendChild(h('div', { class: 'rowf' }, [sx, h('label', { for: 'sfxOn', text: '효과음 켜기 (이 컴퓨터에만 적용)' })]));
-    el.appendChild(h('div', { class: 'rowf' }, [h('button', { class: 'btn sky', type: 'button', html: ICON.speak + '요정 목소리 들어 보기', onclick: function () { speak('안녕! 나는 나무 요정이야. 4번 칸에 도착했구나! 우리 함께 나무를 키워 보자!'); } }),
-      h('span', { class: 'hint', style: 'margin:0', text: (function () { var v = MT.voice.pick(); return v ? '지금 목소리: ' + v.name : '이 기기에 한국어 목소리가 없어요.'; })() })]));
 
     el.appendChild(h('h3', { text: '게임 진행' }));
     el.appendChild(h('div', { class: 'rowf' }, [
@@ -649,14 +651,14 @@
         var id = Sy.newId('sets');
         try { await Sy.putDoc('sets', id, copy); } catch (e) { toast('복제하지 못했어요.'); return; }
         var X = Object.assign({ id: id }, copy);
-        if (C && confirm('복제했어요. 이 반(' + C.name + ')이 복사본을 쓰도록 바꿀까요?')) useSet(X); else E = X;
+        if (C && await MT.ask('복제했어요. 이 반(' + C.name + ')이 복사본을 쓰도록 바꿀까요?', '바꾸기', '그대로 두기')) useSet(X); else E = X;
         openSettings('questions');
       } }),
       h('button', { class: 'btn', type: 'button', text: '새 빈 세트 만들기', onclick: async function () {
         var set = MT.defaultSet('새 문제 세트'), id = Sy.newId('sets');
         try { await Sy.putDoc('sets', id, set); } catch (e) { toast('만들지 못했어요.'); return; }
         var X = Object.assign({ id: id }, set);
-        if (C && confirm('새 세트를 만들었어요. 이 반이 새 세트를 쓰도록 바꿀까요?')) useSet(X); else E = X;
+        if (C && await MT.ask('새 세트를 만들었어요. 이 반이 새 세트를 쓰도록 바꿀까요?', '바꾸기', '그대로 두기')) useSet(X); else E = X;
         openSettings('questions');
       } })
     ]));
@@ -793,7 +795,7 @@
             openSettings('manage');
           } }),
           h('button', { class: 'btn', type: 'button', text: '지우기', onclick: async function () {
-            if (!confirm(c.name + '을(를) 지울까요? 모둠, 아이들 그림, 나무가 모두 지워져요. 문제 세트는 남아요.')) return;
+            if (!(await MT.ask(c.name + '을(를) 지울까요?\n모둠, 아이들 그림, 나무가 모두 지워져요. 문제 세트는 남아요.', '지우기', '취소', { danger: true }))) return;
             try { await Sy.deleteClass(c.id); Sy.clearRoom(c.room).catch(function () {}); } catch (e) { toast('지우지 못했어요.'); return; }
             if (C && C.id === c.id) { C = null; var b = $('#setBack'); if (b) b.remove(); showPicker(); return; }
             openSettings('manage');
@@ -828,7 +830,7 @@
             openSettings('manage');
           } }),
           h('button', { class: 'btn', type: 'button', text: '지우기', disabled: users.length ? 'disabled' : null, title: users.length ? '쓰는 반이 있어서 지울 수 없어요' : '', onclick: async function () {
-            if (!confirm(x.name + '을(를) 지울까요?')) return;
+            if (!(await MT.ask(x.name + '을(를) 지울까요?', '지우기', '취소', { danger: true }))) return;
             try { await Sy.deleteDoc('sets', x.id); } catch (e) { toast('지우지 못했어요.'); }
             openSettings('manage');
           } })
@@ -850,8 +852,9 @@
     makeQR(qr, 220);
     el.appendChild(h('div', { class: 'rowf', style: 'margin-top:18px' }, [
       h('button', { class: 'btn', type: 'button', text: '받은 선물 그림 모두 지우기', onclick: function () {
-        if (!confirm('이 반에 온 선물 그림을 모두 지울까요?')) return;
-        Sy.clearGifts(C.room).then(function () { toast('선물 그림을 지웠어요.'); }).catch(function () { toast('지우지 못했어요.'); });
+        MT.ask('이 반에 온 선물 그림을 모두 지울까요?', '지우기', '취소', { danger: true }).then(function (ok) {
+          if (ok) Sy.clearGifts(C.room).then(function () { toast('선물 그림을 지웠어요.'); }).catch(function () { toast('지우지 못했어요.'); });
+        });
       } })
     ]));
     el.appendChild(h('h3', { text: '태블릿 없이 선물 그림 올리기' }));
@@ -873,7 +876,7 @@
 
   /* ---------- 시작 ---------- */
   $('#btnSettings').addEventListener('click', function () { openSettings(); });
-  $('#btnBloom').addEventListener('click', function () { if (!C) return; if (G.bloomed) showBloom(); else if (confirm('우리 반 나무에 꽃을 피울까요?')) bloom(); });
+  $('#btnBloom').addEventListener('click', function () { if (!C) return; if (G.bloomed) { showBloom(); return; } MT.ask('우리 반 나무에 꽃을 피워 볼까?', '피울래요!', '아직이요', { fairy: true }).then(function (ok) { if (ok) bloom(); }); });
   $('#btnJoin').addEventListener('click', function () { if (C) showJoin(); });
   $('#btnFull').addEventListener('click', function () { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(function () { toast('이 브라우저에서는 전체 화면을 쓸 수 없어요.'); }); });
   $('#btnSayFairy').addEventListener('click', function () { speak($('#fairyText').textContent); });
