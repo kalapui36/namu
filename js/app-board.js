@@ -172,29 +172,61 @@
     }
   }
 
-  // 모둠 목록에서 꾹 눌러 끌어 차례 순서 바꾸기
+  // 모둠 목록에서 꾹 눌러 끌어 차례 순서 바꾸기 (캔바, PPT 슬라이드처럼)
   function bindReorder(row, box) {
-    var timer = null, lifted = false, pid = null;
+    var timer = null, drag = null;
     row.addEventListener('pointerdown', function (e) {
-      pid = e.pointerId;
-      timer = setTimeout(function () { lifted = true; row.classList.add('lift'); try { row.setPointerCapture(pid); } catch (x) {} }, 450);
+      if (drag) return;
+      var sx = e.clientY, pid = e.pointerId;
+      timer = setTimeout(function () {
+        var rows = Array.from(box.children), rects = rows.map(function (r) { return r.getBoundingClientRect(); });
+        var idx = rows.indexOf(row), gap = rects.length > 1 ? rects[1].top - rects[0].top : rects[0].height + 8;
+        drag = { rows: rows, rects: rects, idx: idx, to: idx, gap: gap, startY: sx, scroll: box.parentNode.scrollTop, pid: pid };
+        try { row.setPointerCapture(pid); } catch (x) {}
+        row.classList.add('lift');
+        rows.forEach(function (r) { if (r !== row) r.classList.add('shift'); });
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 300);
+      row._down = { y: sx };
     });
     row.addEventListener('pointermove', function (e) {
-      if (!lifted) return;
+      if (!drag) { if (row._down && Math.abs(e.clientY - row._down.y) > 8) clearTimeout(timer); return; }
       e.preventDefault();
-      var rows = Array.from(box.children), y = e.clientY;
-      var target = rows.filter(function (r) { return r !== row; }).find(function (r) { var b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
-      if (target) box.insertBefore(row, target); else box.appendChild(row);
+      var sc = box.parentNode, dy = e.clientY - drag.startY + (sc.scrollTop - drag.scroll);
+      row.style.transform = 'translateY(' + dy + 'px)';
+      var center = drag.rects[drag.idx].top + drag.rects[drag.idx].height / 2 + dy - (sc.scrollTop - drag.scroll);
+      var to = 0;
+      drag.rects.forEach(function (r, k) { if (k !== drag.idx && center > r.top + r.height / 2 - (sc.scrollTop - drag.scroll)) to += 1; });
+      to = Math.max(0, Math.min(drag.rows.length - 1, to));
+      drag.to = to;
+      drag.rows.forEach(function (r, k) {
+        if (r === row) return;
+        var off = 0;
+        if (drag.idx < to && k > drag.idx && k <= to) off = -drag.gap;
+        if (drag.idx > to && k >= to && k < drag.idx) off = drag.gap;
+        r.style.transform = off ? 'translateY(' + off + 'px)' : '';
+      });
+      // 목록 끝으로 끌면 저절로 스크롤
+      var sr = sc.getBoundingClientRect();
+      if (e.clientY < sr.top + 30 && sc.scrollTop > 0) sc.scrollTop -= 6;
+      else if (e.clientY > sr.bottom - 30 && sc.scrollTop + sc.clientHeight < sc.scrollHeight) sc.scrollTop += 6;
     });
     function end() {
-      clearTimeout(timer);
-      if (!lifted) return;
-      lifted = false; row.classList.remove('lift');
-      var cur = C.dice ? turnTeam() : null;
-      C.order = Array.from(box.children).map(function (r) { return +r.dataset.team; });
-      if (cur !== null) G.turnIdx = C.order.indexOf(cur);
-      saveClass(); renderTeams();
-      toast('차례 순서를 바꿨어요.');
+      clearTimeout(timer); row._down = null;
+      if (!drag) return;
+      var d = drag; drag = null;
+      // 빈자리로 쏙 들어가는 모습
+      var target = d.rects[d.to], cur = row.getBoundingClientRect();
+      row.style.transition = 'transform .18s ease';
+      row.style.transform = 'translateY(' + (target.top - d.rects[d.idx].top) + 'px)';
+      setTimeout(function () {
+        var order = d.rows.slice(); order.splice(d.idx, 1); order.splice(d.to, 0, row);
+        var curTeam = C.dice ? turnTeam() : null;
+        C.order = order.map(function (r) { return +r.dataset.team; });
+        if (curTeam !== null) G.turnIdx = C.order.indexOf(curTeam);
+        saveClass(); renderTeams();
+        if (d.to !== d.idx) toast('차례 순서를 바꿨어요.');
+      }, 190);
     }
     row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
   }
@@ -304,9 +336,15 @@
     if (cell === 0 && !((G.laps || {})[team] > 0)) { toast('한 바퀴를 돌아오면 출발 칸 응원 미션이 열려요.'); return; }
     var carEl = board.carEls[team]; if (!carEl) return;
     carPop = h('button', { class: 'car-pop', type: 'button', html: ICON.q + (cell === 0 ? '출발 칸 응원 미션' : cell + '번 칸 문제 열기'), onclick: function (e) { e.stopPropagation(); hideCarPop(); openQuestion(cell, team); } });
-    carPop.style.left = (parseFloat(carEl.style.left) + carEl.offsetWidth / 2) + 'px';
-    carPop.style.top = (parseFloat(carEl.style.top) - 8) + 'px';
+    // 커진 버스의 머리 위에 (위쪽 자리가 없으면 아래에)
+    var zoom = parseFloat(getComputedStyle(carEl).getPropertyValue('--zoom')) || 1.6;
+    var cw = carEl.offsetWidth, ch = carEl.offsetHeight, cl = parseFloat(carEl.style.left), ct = parseFloat(carEl.style.top);
+    var down = carEl.classList.contains('zoomdown');
+    var topEdge = down ? ct : ct + ch * 0.85 - ch * 0.85 * zoom, bottomEdge = down ? ct + ch * zoom : ct + ch * 0.85 + ch * 0.15 * zoom;
+    carPop.style.left = Math.max(90, Math.min(board.geo.W - 90, cl + cw / 2)) + 'px';
     board.root.appendChild(carPop);
+    if (topEdge - carPop.offsetHeight - 14 < 4) { carPop.classList.add('below'); carPop.style.top = (bottomEdge + 14) + 'px'; }
+    else carPop.style.top = (topEdge - 10) + 'px';
     carPopTimer = setTimeout(hideCarPop, 4000);
   }
   document.addEventListener('pointerdown', function (e) { if (carPop && !carPop.contains(e.target) && !(e.target.closest && e.target.closest('.bv-car'))) hideCarPop(); }, true);

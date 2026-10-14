@@ -503,7 +503,8 @@ button.bv-cell:active { scale: .97; }
 .team-row { position: relative; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
 .team-row.turn { box-shadow: 0 0 0 4px var(--leaf); }
 .team-row.turn::after { content: '차례'; position: absolute; right: 10px; top: 50%; translate: 0 -50%; font-family: var(--f-display); font-size: 15px; color: #fff; background: var(--leaf); padding: 2px 10px; border-radius: 999px; }
-.team-row.lift { opacity: .85; scale: 1.04; box-shadow: 0 10px 20px rgba(90, 60, 40, .25); z-index: 2; }
+.team-row.lift { scale: 1.05; box-shadow: 0 14px 28px rgba(90, 60, 40, .3); z-index: 3; cursor: grabbing; transition: scale .15s, box-shadow .15s; }
+.team-row.shift { transition: transform .2s ease; }
 .turn-tools { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 6px; }
 .move-btn { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-display); font-size: 17px; padding: 6px 14px; min-height: 40px; }
 .move-btn .mini-die { width: 28px; height: 28px; background: #FFF8EC; border: 2px solid #E9C9A6; border-radius: 7px; display: block; }
@@ -514,3 +515,8 @@ button.bv-cell:active { scale: .97; }
 .turn-chip { font-family: var(--f-display); font-size: 18px; padding: 4px 14px; border-radius: 999px; background: #F4EBDF; color: var(--ink-2); }
 
 .dice-core { position: absolute; inset: 3%; background: var(--dc); }
+
+.car-pop { z-index: 10001; }
+.car-pop.below { translate: -50% 0; }
+.car-pop.below::after { bottom: auto; top: -10px; border-top-color: transparent; border-bottom: 10px solid #fff; border-top: 0; }
+.bv-car.zoomdown .bv-car-body { transform-origin: 50% 0; }

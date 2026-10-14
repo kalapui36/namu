@@ -15,7 +15,7 @@ window.MT = window.MT || {};
   // 2층 버스: 창문 위 줄 ceil(n/2)개, 아래 줄 나머지. 아래 줄 창문은 진한 띠에 걸침, 바퀴와 겹치지 않음
   MT.CAR_LV = [0.6, 0.75, 0.88, 1, 1.15];
   MT.carLayout = function (n) {
-    var top = Math.ceil(n / 2), bot = n - top, cols = top, W = 140 + 58 * (cols - 1), pos = [];
+    var top = Math.ceil(n / 2), bot = n - top, cols = top, W = 140 + 58 * (cols - 2), pos = [];
     for (var i = 0; i < top; i++) pos.push([41 + 58 * i, 32]);
     var off = (top - bot) * 29;
     for (var j = 0; j < bot; j++) pos.push([41 + off + 58 * j, 86]);
@@ -524,8 +524,11 @@ window.MT = window.MT || {};
       else {
         self.drawCars(self.state.settings, self.state.game, self.state.avatars, false);
         if (!moved) {
+          // 맨 윗줄처럼 위쪽에 자리가 없으면 아래쪽으로 커지게
+          var zz = parseFloat(getComputedStyle(e).getPropertyValue('--zoom')) || 1.6, eh = e.offsetHeight;
+          e.classList.toggle('zoomdown', parseFloat(e.style.top) + eh * 0.85 * (1 - zz) < 4);
           e.classList.add('zoom'); e.style.zIndex = 9998; clearTimeout(e._zt);
-          e._zt = setTimeout(function () { e.classList.remove('zoom'); self.drawCars(self.state.settings, self.state.game, self.state.avatars, false); }, 3500);
+          e._zt = setTimeout(function () { e.classList.remove('zoom', 'zoomdown'); self.drawCars(self.state.settings, self.state.game, self.state.avatars, false); }, 3500);
           if (self.opts.onCarTap) self.opts.onCarTap(team, e);
         }
       }
