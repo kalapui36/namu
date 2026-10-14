@@ -72,6 +72,16 @@ window.MT = window.MT || {};
       }, function (e) { console.warn(e); });
     },
 
+    // 태블릿 → 주사위 굴리기 요청
+    sendRoll: function (code, team, value, power) {
+      return Sync.room(code).collection('rolls').add({ team: team, value: value, power: power, ts: Date.now() });
+    },
+    watchRolls: function (code, cb) {
+      return Sync.room(code).collection('rolls').onSnapshot(function (snap) {
+        cb(snap.docChanges().filter(function (c) { return c.type === 'added'; }).map(function (c) { var v = c.doc.data(); return { id: c.doc.id, team: v.team, value: v.value, power: v.power, ts: v.ts || 0, ref: c.doc.ref }; }));
+      }, function (e) { console.warn(e); });
+    },
+
     /* ---------- 반과 문제 세트 저장 ---------- */
     _later: {},
     later: function (key, fn, ms) { clearTimeout(Sync._later[key]); Sync._later[key] = setTimeout(fn, ms || 600); },
@@ -118,6 +128,8 @@ window.MT = window.MT || {};
       var gifts = await ref.collection('gifts').get();
       var batch = Sync.db.batch();
       gifts.forEach(function (d) { batch.delete(d.ref); });
+      var rolls = await ref.collection('rolls').get();
+      rolls.forEach(function (d) { batch.delete(d.ref); });
       batch.delete(ref);
       await batch.commit();
     },

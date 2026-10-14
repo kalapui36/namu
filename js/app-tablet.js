@@ -4,6 +4,7 @@
   var room = params.get('room') || localStorage.getItem('namugil.tablet.room') || '';
   var team = null, state = null, gifts = [], unsubState = null, unsubGifts = null;
   var board = null, lastPopup = '', lastFairy = '', wasBloomed = null, drawing = null;
+  var avatars = [], avKey = '', lastRoll = null, rollSent = false;
 
   function $(s) { return document.querySelector(s); }
   function h(tag, attrs, kids) {
@@ -28,7 +29,7 @@
 
   function settingsFrom(st) {
     var teams = (st.teams || []).map(function (t) { return { name: t.name, color: t.color, seats: t.seats }; });
-    return { cellCount: st.cellCount, cellColors: st.cellColors, missions: st.missions, teams: teams, teamCount: st.teamCount, title: st.title };
+    return { cellCount: st.cellCount, cellColors: st.cellColors, missions: st.missions, teams: teams, teamCount: st.teamCount, title: st.title, carSize: st.carSize || 4 };
   }
   function gameFrom(st) {
     var cur = st.popup && st.popup.qkey;
@@ -92,13 +93,22 @@
     document.title = (s.title || '나무 길 보드게임') + ' - ' + s.teams[team].name;
     $('#myCar').innerHTML = MT.carSVG(s.teams[team].color, s.teams[team].seats, null, String(team + 1)).svg;
     $('#myName').textContent = s.teams[team].name;
-    board.render(s, gameFrom(state), [], false);
+    // 아이들 얼굴: 반이 바뀌거나 그림이 바뀌면 다시 불러오기
+    var k = (state.classId || '') + '|' + (state.avatarsVer || '');
+    if (state.classId && k !== avKey) { avKey = k; MT.Sync.listAvatars(state.classId).then(function (list) { avatars = list; update(); }).catch(function () {}); }
+    board.render(s, gameFrom(state), avatars, false);
+    $('#myCar').innerHTML = MT.carSVG(s.teams[team].color, s.teams[team].seats, avatars.filter(function (a) { return a.team === team; }).map(function (a) { return a.img; }), String(team + 1)).svg;
+    drawTurn(s);
     var f = state.fairy;
     if (f && f.id !== lastFairy) {
       lastFairy = f.id; var b = $('#tFairy'); b.textContent = f.text; b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
       $('#tFairyImg').src = f.mood === 'cheer' ? MT.IMG.fairyCheer : MT.IMG.fairyGuide;
     }
     drawPopup();
+    // 주사위: 새로 굴린 것만 굴러가는 모습 보여 주기
+    var r = state.roll;
+    if (r && r.id !== lastRoll) { var first = lastRoll === null; lastRoll = r.id; rollSent = false; if (!first) board.rollDice(r, (s.teams[r.team] || {}).color); drawTurn(s); }
+    if (!r && lastRoll === null) lastRoll = '';
     if (wasBloomed === false && state.bloomed) showBloom();
     wasBloomed = !!state.bloomed;
   }
@@ -142,6 +152,26 @@
       h('button', { class: 'btn big primary', type: 'button', text: '나무 보러 가기', onclick: function () { back.remove(); } })
     ]));
     $('#layer').appendChild(back);
+  }
+
+  /* ---------- 차례와 주사위 ---------- */
+  function drawTurn(s) {
+    var old = $('#turnBanner'); if (old) old.remove();
+    var chip = $('#turnChip');
+    if (!state.dice || state.turnTeam === null || state.turnTeam === undefined) { if (chip) chip.remove(); return; }
+    var mine = state.turnTeam === team, rolled = state.roll && state.roll.turnKey === state.turnKey;
+    if (!chip) { chip = h('span', { class: 'turn-chip', id: 'turnChip' }); var top = $('.tab-top'); if (top) top.appendChild(chip); }
+    chip.textContent = mine ? '우리 모둠 차례' : (s.teams[state.turnTeam] || {}).name + ' 차례예요';
+    if (!mine || rolled || $('#tq') || $('#drawBack')) return;
+    var banner = h('div', { class: 'turn-banner', id: 'turnBanner' }, [h('h2', { text: '우리 모둠 차례예요!' })]);
+    banner.style.setProperty('--tc', s.teams[team].color);
+    var btn = MT.diceButton('꾹 눌렀다 떼면 굴러가요', function (power) {
+      if (rollSent) return; rollSent = true; btn.disabled = true;
+      MT.Sync.sendRoll(room, team, 1 + Math.floor(Math.random() * 6), +power.toFixed(2)).catch(function () { rollSent = false; btn.disabled = false; toast('보내지 못했어요. 인터넷을 확인해 주세요.'); });
+    }, true);
+    if (rollSent) btn.disabled = true;
+    banner.appendChild(btn);
+    document.body.appendChild(banner);
   }
 
   /* ---------- 선물 그리기 (칠판에서 그림 문제가 열리면 자동으로) ---------- */

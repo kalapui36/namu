@@ -15,7 +15,13 @@ service cloud.firestore {
     match /rooms/{room} {
       allow read, delete: if room.matches('^[0-9]{4,6}$');
       allow create, update: if room.matches('^[0-9]{4,6}$')
-                            && request.resource.data.keys().size() < 30;
+                            && request.resource.data.keys().size() < 40;
+      match /rolls/{r} {
+        allow read, delete: if true;
+        allow create: if request.resource.data.team is int
+                      && request.resource.data.value is int
+                      && request.resource.data.value >= 1 && request.resource.data.value <= 6;
+      }
       match /gifts/{gift} {
         allow read, delete: if true;
         allow create, update: if request.resource.data.img is string

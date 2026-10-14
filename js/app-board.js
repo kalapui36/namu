@@ -50,9 +50,14 @@
     MT.ensureColors(T);
     S = {
       title: T.title || '나무 길 보드게임', cellCount: T.cellCount, cellColors: T.cellColors, missions: T.missions, questions: T.questions || {}, seed: T.seed,
-      teams: C.teams, teamCount: C.teamCount, leafPerWin: C.leafPerWin || 6, autoRead: !!C.autoRead, room: C.room
+      teams: C.teams, teamCount: C.teamCount, leafPerWin: C.leafPerWin || 6, autoRead: !!C.autoRead, room: C.room, carSize: C.carSize || 4
     };
+    // 차례 순서: 모둠 수에 맞게 정리
+    var ord = (C.order || []).filter(function (t) { return t < C.teamCount; });
+    for (var t = 0; t < C.teamCount; t++) if (ord.indexOf(t) < 0) ord.push(t);
+    C.order = ord;
   }
+  function turnTeam() { return C.order[(G.turnIdx || 0) % C.teamCount]; }
 
   /* ---------- 저장 ---------- */
   function saveClass() { C.game = G; Sy.putLater('classes', C.id, C); pushSync(); }
@@ -77,7 +82,9 @@
     Sy.pushState(C.room, {
       title: S.title, className: C.name, teamCount: S.teamCount, teams: teams, cellCount: S.cellCount, cellColors: S.cellColors, missions: S.missions,
       positions: G.positions, leaves: G.leaves, buds: G.buds, cleared: G.cleared, grass: G.grass, rainbowN: G.rainbowN || 0,
-      bloomed: G.bloomed, fairy: G.fairy, popup: popupMirror()
+      bloomed: G.bloomed, fairy: G.fairy, popup: popupMirror(),
+      classId: C.id, avatarsVer: A.map(function (a) { return a.id.slice(0, 4) + a.team; }).join(',').length + '-' + A.length + '-' + A.filter(function (a) { return a.team >= 0; }).length,
+      carSize: C.carSize || 4, dice: !!C.dice, order: C.order, turnTeam: C.dice ? turnTeam() : null, turnKey: G.turnKey || 0, roll: G.dice || null
     });
   }
 
@@ -100,13 +107,29 @@
       updateGallery(); render();
     });
   }
+  var unsubRolls = null;
+  function watchRolls() {
+    if (unsubRolls) { unsubRolls(); unsubRolls = null; }
+    if (!syncOn || !C) return;
+    var startedAt = Date.now();
+    unsubRolls = Sy.watchRolls(C.room, function (list) {
+      list.forEach(function (r) {
+        if (r.ref) r.ref.delete().catch(function () {});
+        if (r.ts < startedAt - 5000) return;            // 예전에 남은 요청은 무시
+        if (!C.dice || r.team !== turnTeam()) return;
+        if (G.dice && G.dice.turnKey === (G.turnKey || 0)) return;   // 한 차례에 한 번
+        doRoll(r.team, r.value, r.power);
+      });
+    });
+  }
+
   function hangingGifts() {
     var cur = popup && popup.qkey;
     return gifts.filter(function (g) { return g.qkey !== cur; }).slice(-12);
   }
 
   /* ---------- 그리기 ---------- */
-  var board = new MT.BoardView($('#board'), { interactive: true, onCellClick: function (c) { openQuestion(c); }, onCarDrop: carDropped, onCarTap: carTapped });
+  var board = new MT.BoardView($('#board'), { interactive: true, onCellClick: function (c) { openQuestion(c); }, onCarDrop: function (t, c) { if (G.dice && G.dice.team === t) G.dice.moved = true; carDropped(t, c); }, onCarTap: carTapped, onDiceBounce: function () { MT.sfx.dice(); } });
 
   function render(force) {
     if (!C) return;
@@ -121,11 +144,102 @@
   function renderTeams() {
     $('#classTree').textContent = G.leaves.length ? '우리 반 나무에 나뭇잎이 ' + G.leaves.length + '장 자랐어요' + (G.buds.length ? ', 꽃봉오리도 ' + G.buds.length + '개 자랐어요' : '') + '.' : '우리 반 나무가 나뭇잎을 기다리고 있어요.';
     var box = $('#teamList'); box.innerHTML = '';
-    for (var t = 0; t < S.teamCount; t++) {
+    var cur = C.dice ? turnTeam() : -1;
+    C.order.forEach(function (t) {
       var faces = A.filter(function (a) { return a.team === t; }).map(function (a) { return a.img; });
       var car = MT.carSVG(S.teams[t].color, MT.carSeats(S, A, t), faces, String(t + 1));
-      box.appendChild(h('div', { class: 'team-row' }, [h('div', { class: 'car-mini', html: car.svg }), h('div', null, [h('div', { class: 'team-name', text: S.teams[t].name })])]));
+      var row = h('div', { class: 'team-row' + (t === cur ? ' turn' : ''), title: '꾹 눌러 끌면 차례 순서를 바꿀 수 있어요' }, [h('div', { class: 'car-mini', html: car.svg }), h('div', null, [h('div', { class: 'team-name', text: S.teams[t].name })])]);
+      row.dataset.team = t;
+      bindReorder(row, box);
+      box.appendChild(row);
+    });
+    var tools = $('#turnTools');
+    if (!tools) { tools = h('div', { class: 'turn-tools', id: 'turnTools' }); box.parentNode.insertBefore(tools, $('#syncBadge')); }
+    // 누르고 있는 중에 다시 그려서 단추가 바뀌지 않도록, 상태가 바뀔 때만 다시 그림
+    var tkey = JSON.stringify([!!C.dice, G.dice && G.dice.id, G.dice && G.dice.moved, G.turnKey, cur]);
+    if (tools._key === tkey && tools.firstChild) return;
+    tools._key = tkey;
+    tools.innerHTML = '';
+    if (C.dice) {
+      if (G.dice && G.dice.moved && G.dice.turnKey === (G.turnKey || 0)) {
+        tools.appendChild(h('p', { class: 'hint', style: 'margin:0;text-align:center', text: '미션 창을 닫으면 다음 모둠 차례예요.' }));
+      } else if (G.dice && !G.dice.moved && G.dice.turnKey === (G.turnKey || 0)) {
+        var mini = h('span', { class: 'mini-die', html: MT.diceFaceSVG(G.dice.value) });
+        tools.appendChild(h('button', { class: 'btn move-btn', type: 'button', onclick: function () { autoMove(G.dice.team, G.dice.value); } }, [mini, '이동하기']));
+      } else {
+        tools.appendChild(MT.diceButton('꾹 눌러 굴리기', function (power) { doRoll(turnTeam(), 1 + Math.floor(Math.random() * 6), power); }));
+      }
     }
+  }
+
+  // 모둠 목록에서 꾹 눌러 끌어 차례 순서 바꾸기
+  function bindReorder(row, box) {
+    var timer = null, lifted = false, pid = null;
+    row.addEventListener('pointerdown', function (e) {
+      pid = e.pointerId;
+      timer = setTimeout(function () { lifted = true; row.classList.add('lift'); try { row.setPointerCapture(pid); } catch (x) {} }, 450);
+    });
+    row.addEventListener('pointermove', function (e) {
+      if (!lifted) return;
+      e.preventDefault();
+      var rows = Array.from(box.children), y = e.clientY;
+      var target = rows.filter(function (r) { return r !== row; }).find(function (r) { var b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+      if (target) box.insertBefore(row, target); else box.appendChild(row);
+    });
+    function end() {
+      clearTimeout(timer);
+      if (!lifted) return;
+      lifted = false; row.classList.remove('lift');
+      var cur = C.dice ? turnTeam() : null;
+      C.order = Array.from(box.children).map(function (r) { return +r.dataset.team; });
+      if (cur !== null) G.turnIdx = C.order.indexOf(cur);
+      saveClass(); renderTeams();
+      toast('차례 순서를 바꿨어요.');
+    }
+    row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
+  }
+
+  /* ---------- 주사위와 차례 ---------- */
+  function doRoll(team, value, power) {
+    G.dice = { id: MT.uid(), team: team, value: value, power: +power.toFixed(2), turnKey: G.turnKey || 0, moved: false };
+    saveClass();
+    var d = G.dice;
+    board.rollDice(d, S.teams[team].color, function () {
+      MT.sfx.open();
+      var name = teamName(team);
+      setFairy(josa(name, '이', '가') + ' 주사위를 굴렸어! ' + value + '칸 앞으로 가 보자.', 'guide', josa(name, '이', '가') + ', 주사위를 굴렸어! ' + value + '칸, 앞으로 가 보자.');
+      saveClass(); renderFairy(); renderTeams();
+    });
+    renderTeams();
+  }
+  var moving = false;
+  async function autoMove(team, steps) {
+    if (moving) return; moving = true;
+    var N = S.cellCount, from = G.positions[team];
+    if (from === undefined || from === null) from = 0;
+    if (G.dice) G.dice.moved = true;
+    renderTeams();
+    for (var i = 1; i <= steps; i++) {
+      var p = (from + i) % N;
+      G.positions[team] = p;
+      MT.sfx.step(i - 1);
+      render();
+      await new Promise(function (r) { setTimeout(r, 420); });
+    }
+    moving = false;
+    var final = G.positions[team];
+    delete G.positions[team];
+    G.positions[team] = from;
+    carDropped(team, final);
+  }
+  function advanceTurn() {
+    if (!C || !C.dice) return;
+    G.turnIdx = ((G.turnIdx || 0) + 1) % C.teamCount;
+    G.turnKey = (G.turnKey || 0) + 1;
+    G.dice = null;
+    var name = teamName(turnTeam());
+    setFairy(name + ' 차례야! 주사위를 굴려 볼까?', 'guide', name + ' 차례야! 주사위를, 굴려 볼까?');
+    MT.sfx.turn();
   }
 
   var lastFairyId = null;
@@ -223,7 +337,7 @@
   }
   function closePopup() {
     var b = $('#qback'); if (b) b.remove();
-    popup = null; saveClass(); render();
+    popup = null; advanceTurn(); saveClass(); render();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
   }
 
@@ -291,6 +405,7 @@
     var rec = { cell: cell, team: team, leaves: [], bud: null };
     var b = $('#qback'); if (b) b.remove();
     popup = null;
+    advanceTurn();
     if (bonus) setFairy('정말 잘했어! 우리 반 나무에 나뭇잎이 ' + n + '장 자랐어. 다른 모둠이 다녀간 칸이라 꽃봉오리도 하나 달렸어!', 'cheer',
       '정말 잘했어! 우리 반 나무에, 나뭇잎이 ' + n + '장 자랐어. 다른 모둠이 다녀간 칸이라, 꽃봉오리도 하나 달렸어!');
     else setFairy('정말 잘했어! 우리 반 나무에 나뭇잎이 ' + n + '장 자랐어.', 'cheer', '정말 잘했어! 우리 반 나무에, 나뭇잎이 ' + n + '장 자랐어.');
@@ -575,6 +690,7 @@
     if (!G.fairy) setFairy(MT.FAIRY_LINES.hello, 'guide', MT.FAIRY_LINES.helloSay);
     render(true);
     watchGifts();
+    watchRolls();
     pushSync();
     showHowto();
   }
@@ -631,6 +747,14 @@
     var cb = h('input', { type: 'checkbox', id: 'autoRead', style: 'width:28px;height:28px', onchange: function (e) { C.autoRead = e.target.checked; sv(); saveClass(); } });
     cb.checked = !!C.autoRead;
     el.appendChild(h('div', { class: 'rowf' }, [cb, h('label', { for: 'autoRead', text: '문제 창이 열리면 요정이 자동으로 읽어 주기' })]));
+    var lvRow = h('div', { class: 'stepper', role: 'group', 'aria-label': '자동차 크기' });
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      lvRow.appendChild(h('button', { class: 'btn round', type: 'button', 'aria-pressed': (C.carSize || 4) === n ? 'true' : 'false', style: (C.carSize || 4) === n ? 'background:var(--leaf);color:#fff' : '', text: n, onclick: function () { C.carSize = n; sv(); saveClass(); render(true); openSettings('class'); } }));
+    });
+    el.appendChild(h('div', { class: 'rowf' }, [h('span', { text: '자동차 크기' }), lvRow, h('span', { class: 'hint', style: 'margin:0', text: '처음 값은 4예요. 차와 아이들 그림이 같은 비율로 커지고 작아져요.' })]));
+    var dc = h('input', { type: 'checkbox', id: 'diceOn', style: 'width:28px;height:28px', onchange: function (e) { C.dice = e.target.checked; G.turnIdx = 0; G.turnKey = (G.turnKey || 0) + 1; G.dice = null; saveClass(); render(true); } });
+    dc.checked = !!C.dice;
+    el.appendChild(h('div', { class: 'rowf' }, [dc, h('label', { for: 'diceOn', text: '프로그램 주사위 쓰기 (차례인 모둠 태블릿에서 꾹 눌러 굴려요)' })]));
     var sx = h('input', { type: 'checkbox', id: 'sfxOn', style: 'width:28px;height:28px', onchange: function (e) { MT.sfx.set(e.target.checked); } });
     sx.checked = MT.sfx.isOn();
     el.appendChild(h('div', { class: 'rowf' }, [sx, h('label', { for: 'sfxOn', text: '효과음 켜기 (이 컴퓨터에만 적용)' })]));

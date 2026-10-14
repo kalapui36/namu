@@ -45,6 +45,9 @@ window.MT = window.MT || {};
     bud: function () { glide(520, 1250, 0, 0.32, 0.7); bell(1568, 0.14, 0.3, 0.4); },         // 뽀용
     rainbow: function () { SCALE.concat([2349, 2637]).forEach(function (f, i) { bell(f, i * 0.06, 0.4, 0.45); }); }, // 반짝 계단
     gift: function () { bell(1760, 0, 0.12, 0.5); bell(2349, 0.05, 0.18, 0.35); },           // 톡
+    dice: function () { bell(660 + Math.random() * 300, 0, 0.07, 0.35); },                     // 주사위 톡톡
+    step: function (i) { bell(SCALE[(i || 0) % SCALE.length] / 2, 0, 0.12, 0.4); },               // 한 칸 이동
+    turn: function () { bell(1568, 0, 0.25, 0.5); bell(2093, 0.1, 0.35, 0.45); },                   // 차례
     bloom: function () { [1046.5, 1318.5, 1568].forEach(function (f, i) { bell(f, i * 0.12, 0.5, 0.7); }); [1046.5, 1318.5, 1568, 2093].forEach(function (f) { bell(f, 0.42, 1.2, 0.45); }); }
   };
 })(window.MT);

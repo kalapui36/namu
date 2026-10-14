@@ -12,30 +12,35 @@ window.MT = window.MT || {};
     var n = Math.max(settings.teams[team].seats || 4, mine.length);
     return Math.max(3, Math.min(5, n));
   };
+  // 2층 버스: 창문 위 줄 ceil(n/2)개, 아래 줄 나머지. 아래 줄 창문은 진한 띠에 걸침, 바퀴와 겹치지 않음
+  MT.CAR_LV = [0.6, 0.75, 0.88, 1, 1.15];
+  MT.carLayout = function (n) {
+    var top = Math.ceil(n / 2), bot = n - top, cols = top, W = 140 + 58 * (cols - 1), pos = [];
+    for (var i = 0; i < top; i++) pos.push([41 + 58 * i, 32]);
+    var off = (top - bot) * 29;
+    for (var j = 0; j < bot; j++) pos.push([41 + off + 58 * j, 86]);
+    return { W: W, H: 147, pos: pos };
+  };
   MT.carSVG = function (color, seats, faces, label) {
-    var n = seats, vbW = 58 + 40 * n, id = 'c' + Math.random().toString(36).slice(2, 8);
+    var L = MT.carLayout(seats), W = L.W, id = 'c' + Math.random().toString(36).slice(2, 8);
     var dark = MT.shade(color, 0.3), cabin = MT.mix(color, 0.45);
-    var s = '<svg viewBox="0 0 ' + vbW + ' 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
-    s += '<defs>';
-    for (var i = 0; i < n; i++) s += '<clipPath id="' + id + i + '"><circle cx="' + (30 + i * 40) + '" cy="29" r="14.5"/></clipPath>';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + L.H + '" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>';
+    L.pos.forEach(function (p, i) { s += '<clipPath id="' + id + i + '"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="22"/></clipPath>'; });
     s += '</defs>';
-    s += '<ellipse cx="' + vbW / 2 + '" cy="91" rx="' + (vbW * 0.42) + '" ry="4" fill="rgba(91,70,54,.18)"/>';
-    s += '<rect x="12" y="6" width="' + (vbW - 34) + '" height="46" rx="21" fill="' + cabin + '" stroke="' + dark + '" stroke-width="2.5"/>';
-    s += '<rect x="4" y="42" width="' + (vbW - 8) + '" height="34" rx="16" fill="' + color + '" stroke="' + dark + '" stroke-width="2.5"/>';
-    s += '<path d="M14 50 H' + (vbW - 22) + '" stroke="rgba(255,255,255,.55)" stroke-width="3" stroke-linecap="round"/>';
-    for (var w = 0; w < n; w++) {
-      var cx = 30 + w * 40;
-      s += '<circle cx="' + cx + '" cy="29" r="17" fill="#fff" stroke="' + dark + '" stroke-width="2.2"/>';
-      var src = faces && faces[w] ? faces[w] : MT.IMG.fairyFace;
-      var op = faces && faces[w] ? 1 : 0.5;
-      s += '<image href="' + src + '" x="' + (cx - 14.5) + '" y="14.5" width="29" height="29" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + id + w + ')" opacity="' + op + '"/>';
-    }
-    s += '<circle cx="' + (vbW - 11) + '" cy="55" r="5" fill="#FFF3A6" stroke="' + dark + '" stroke-width="1.8"/>';
-    s += '<circle cx="23" cy="78" r="11" fill="#6B5446"/><circle cx="23" cy="78" r="4.5" fill="#EBDDCD"/>';
-    s += '<circle cx="' + (vbW - 25) + '" cy="78" r="11" fill="#6B5446"/><circle cx="' + (vbW - 25) + '" cy="78" r="4.5" fill="#EBDDCD"/>';
-    if (label) s += '<text x="' + (vbW / 2 - 2) + '" y="69" text-anchor="middle" font-family="Jua, sans-serif" font-size="17" fill="' + MT.shade(color, 0.55) + '">' + label + '</text>';
+    s += '<ellipse cx="' + W / 2 + '" cy="143" rx="' + (W * 0.42) + '" ry="3.5" fill="rgba(91,70,54,.18)"/>';
+    s += '<rect x="3" y="3" width="' + (W - 6) + '" height="110" rx="24" fill="' + cabin + '" stroke="' + dark + '" stroke-width="2.5"/>';
+    s += '<rect x="2" y="100" width="' + (W - 4) + '" height="20" rx="10" fill="' + color + '" stroke="' + dark + '" stroke-width="2.5"/>';
+    L.pos.forEach(function (p, i) {
+      s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="24.5" fill="#fff" stroke="' + dark + '" stroke-width="2.5"/>';
+      var has = faces && faces[i], src = has ? faces[i] : MT.IMG.fairyFace;
+      s += '<image href="' + src + '" x="' + (p[0] - 22) + '" y="' + (p[1] - 22) + '" width="44" height="44" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + id + i + ')" opacity="' + (has ? 1 : 0.5) + '"/>';
+    });
+    s += '<circle cx="' + (W - 7) + '" cy="108" r="3.8" fill="#FFF3A6" stroke="' + dark + '" stroke-width="1.4"/>';
+    s += '<circle cx="32" cy="128" r="15" fill="#6B5446"/><circle cx="32" cy="128" r="6" fill="#EBDDCD"/>';
+    s += '<circle cx="' + (W - 32) + '" cy="128" r="15" fill="#6B5446"/><circle cx="' + (W - 32) + '" cy="128" r="6" fill="#EBDDCD"/>';
+    if (label) s += '<text x="' + W / 2 + '" y="115.5" text-anchor="middle" font-family="Jua, sans-serif" font-size="14" fill="' + MT.shade(color, 0.55) + '">' + label + '</text>';
     s += '</svg>';
-    return { svg: s, vbW: vbW };
+    return { svg: s, vbW: W, vbH: L.H };
   };
 
   MT.budSVG = function () {
@@ -162,10 +167,11 @@ window.MT = window.MT || {};
     return { W: W, H: H, cs: cs, pts: pts, center: c, tree: tree };
   };
 
-  BoardView.prototype.carSize = function (seats) {
-    var cs = this.geo.cs;
-    var w = cs * (0.5 + 0.2 * seats);
-    return { w: w, h: w * 96 / (58 + 40 * seats) };
+  // 4단계 기준: 2열 버스 폭 = 칸의 1.094배 (얼굴 지름이 예전의 약 2배)
+  BoardView.prototype.carSize = function (seats, scale) {
+    var cs = this.geo.cs, L = MT.carLayout(seats), lv = MT.CAR_LV[((this.state && this.state.settings.carSize) || 4) - 1] || 1;
+    var w = cs * 1.094 * (L.W / 140) * lv * (scale || 1);
+    return { w: w, h: w * L.H / L.W };
   };
 
   BoardView.prototype.render = function (settings, game, avatars, force) {
@@ -394,26 +400,40 @@ window.MT = window.MT || {};
     Object.keys(this.giftEls).forEach(function (id) { if (!keep[id]) { self.giftEls[id].remove(); delete self.giftEls[id]; } });
   };
 
+  // 칸의 안쪽(나무 쪽) 방향
+  BoardView.prototype.inward = function (i) {
+    var g = this.geo, p = g.pts[i], m = g.cs / 2;
+    if (p[1] > g.H - m * 2.2) return [0, -1];
+    if (p[1] < m * 2.2) return [0, 1];
+    if (p[0] < m * 2.2) return [1, 0];
+    return [-1, 0];
+  };
   BoardView.prototype.carHome = function (settings, game, avatars, team) {
     var g = this.geo, pos = game.positions[team];
-    var seats = MT.carSeats(settings, avatars, team), sz = this.carSize(seats);
+    var seats = MT.carSeats(settings, avatars, team);
     if (pos === undefined || pos === null || pos >= g.pts.length) {
-      // 주차장: 가운데 왼쪽 아래
-      var c = g.center, col = team % 2, row = Math.floor(team / 2);
-      var colW = Math.min((g.tree.x - c.x) / 2, this.carSize(5).w * 1.04);
-      return { x: c.x + colW * col + colW / 2, y: c.y + c.h - sz.h * 0.6 - row * sz.h * 1.12, sz: sz, seats: seats };
+      var sz0 = this.carSize(seats, 0.8), c = g.center, col = team % 2, row = Math.floor(team / 2);
+      var colW = Math.min((g.tree.x - c.x) / 2, sz0.w * 1.08);
+      return { x: c.x + colW * col + colW / 2, y: c.y + c.h - sz0.h * 0.55 - row * sz0.h * 1.05, sz: sz0, seats: seats, gs: 0.8 };
     }
-    // 같은 칸에 여러 대면 살짝 겹쳐 놓기
     var same = [];
     for (var t = 0; t < settings.teamCount; t++) if (game.positions[t] === pos) same.push(t);
     var idx = same.indexOf(team), k = same.length;
+    // 1대 그대로, 2대 0.76배 나란히, 3~4대 0.6배 2줄, 5대 이상 0.5배 3열
+    var gs = k === 1 ? 1 : k === 2 ? 0.76 : k <= 4 ? 0.6 : 0.5, perRow = k === 1 ? 1 : k <= 4 ? 2 : 3;
+    var sz = this.carSize(seats, gs), slot = this.carSize(4, gs);
+    var rows = Math.ceil(k / perRow), r = Math.floor(idx / perRow), cIn = idx % perRow, inRow = Math.min(perRow, k - r * perRow);
+    var inw = this.inward(pos), tan = [Math.abs(inw[1]), Math.abs(inw[0])];
+    var along = (cIn - (inRow - 1) / 2) * slot.w * 0.98;
+    var depth = inw[1] ? slot.h : slot.w;
+    var base = g.cs * 0.12 + (inw[1] ? 0 : 0);
+    var into = base + r * depth * 0.92 + (rows > 1 ? 0 : 0);
     var pt = g.pts[pos];
-    var cols = Math.ceil(k / 2), col = Math.floor(idx / 2), row = k > 1 ? idx % 2 : 0;
-    var dx = (col - (cols - 1) / 2) * sz.w * 0.7;
-    var dy = g.cs * 0.28 + (k > 1 ? (row - 0.5) * sz.h * 0.95 : 0);
-    var x = Math.max(sz.w / 2 + 4, Math.min(g.W - sz.w / 2 - 4, pt[0] + dx));
-    var y = Math.max(sz.h / 2 + 4, Math.min(g.H - sz.h / 2 - 6, pt[1] + dy));
-    return { x: x, y: y, sz: sz, seats: seats };
+    var x = pt[0] + tan[0] * along + inw[0] * into;
+    var y = pt[1] + tan[1] * along + inw[1] * into + (inw[1] === 0 ? (r ? 0 : 0) : 0);
+    x = Math.max(sz.w / 2 + 4, Math.min(g.W - sz.w / 2 - 4, x));
+    y = Math.max(sz.h / 2 + 4, Math.min(g.H - sz.h / 2 - 6, y));
+    return { x: x, y: y, sz: sz, seats: seats, gs: gs };
   };
 
   BoardView.prototype.drawCars = function (settings, game, avatars, force) {
@@ -436,6 +456,9 @@ window.MT = window.MT || {};
         e.firstChild.innerHTML = MT.carSVG(settings.teams[t].color, home.seats, faces, String(t + 1)).svg;
         e.setAttribute('aria-label', settings.teams[t].name + ' 자동차');
       }
+      // 잡거나 눌렀을 때 얼굴이 예전의 4배가 되도록 (지금 크기 기준)
+      var lv = MT.CAR_LV[(settings.carSize || 4) - 1] || 1;
+      e.style.setProperty('--zoom', Math.max(1.15, 2 / (lv * home.gs)).toFixed(2));
       if (e._dragging) continue;
       var prevX = e._x, prevY = e._y;
       e.style.width = home.sz.w + 'px'; e.style.height = home.sz.h + 'px';
@@ -445,6 +468,23 @@ window.MT = window.MT || {};
         e.classList.remove('drive'); void e.offsetWidth; e.classList.add('drive');
       }
       e._x = home.x; e._y = home.y;
+    }
+    this.drawTags(settings, game);
+  };
+
+  // 자동차가 선 칸은 번호가 가려지므로, 칸 바깥쪽 가장자리에 번호표를 띄움
+  BoardView.prototype.drawTags = function (settings, game) {
+    if (!this.tags) this.tags = el('div', 'bv-tags', this.root);
+    this.tags.innerHTML = '';
+    var g = this.geo, seen = {};
+    for (var t = 0; t < settings.teamCount; t++) {
+      var pos = game.positions[t];
+      if (pos === undefined || pos === null || seen[pos] || pos >= g.pts.length) continue;
+      seen[pos] = 1;
+      var p = g.pts[pos], inw = this.inward(pos), d = g.cs * 0.5;
+      var tag = el('span', 'bv-tag' + (pos === 0 ? ' start' : ' c-' + MT.cellColor(settings, pos)), this.tags);
+      tag.textContent = pos === 0 ? '출발' : pos;
+      tag.style.left = (p[0] - inw[0] * d) + 'px'; tag.style.top = (p[1] - inw[1] * d) + 'px';
     }
   };
 
@@ -483,11 +523,88 @@ window.MT = window.MT || {};
       if (moved && hit !== undefined && hit >= 0 && self.opts.onCarDrop) self.opts.onCarDrop(team, hit);
       else {
         self.drawCars(self.state.settings, self.state.game, self.state.avatars, false);
-        if (!moved && self.opts.onCarTap) self.opts.onCarTap(team, e);
+        if (!moved) {
+          e.classList.add('zoom'); e.style.zIndex = 9998; clearTimeout(e._zt);
+          e._zt = setTimeout(function () { e.classList.remove('zoom'); self.drawCars(self.state.settings, self.state.game, self.state.avatars, false); }, 3500);
+          if (self.opts.onCarTap) self.opts.onCarTap(team, e);
+        }
       }
     }
     e.addEventListener('pointerup', end);
     e.addEventListener('pointercancel', end);
+  };
+
+  /* ---------- 주사위 ---------- */
+  // 면: 앞1 뒤6 오른쪽3 왼쪽4 위2 아래5
+  var PIPS = { 1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[26, 26], [50, 50], [74, 74]], 4: [[28, 28], [72, 28], [28, 72], [72, 72]], 5: [[26, 26], [74, 26], [50, 50], [26, 74], [74, 74]], 6: [[28, 24], [72, 24], [28, 50], [72, 50], [28, 76], [72, 76]] };
+  var FACE_ROT = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
+  var FACE_POS = { 1: 'rotateY(0deg)', 6: 'rotateY(180deg)', 3: 'rotateY(90deg)', 4: 'rotateY(-90deg)', 2: 'rotateX(90deg)', 5: 'rotateX(-90deg)' };
+  MT.diceFaceSVG = function (n) {
+    return '<svg viewBox="0 0 100 100" aria-hidden="true">' + PIPS[n].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="' + (n === 1 ? 13 : 10) + '" fill="#5B3B2A"/>'; }).join('') + '</svg>';
+  };
+  MT.makeDice = function (size, color) {
+    var cube = el('div', 'dice-cube');
+    cube.style.setProperty('--ds', size + 'px');
+    cube.style.setProperty('--dc', color || '#E9C9A6');
+    // 둥근 모서리 사이 틈이 보이지 않게 안쪽을 채우는 면
+    ['rotateY(0deg)', 'rotateY(180deg)', 'rotateY(90deg)', 'rotateY(-90deg)', 'rotateX(90deg)', 'rotateX(-90deg)'].forEach(function (r) {
+      var core = el('div', 'dice-core', cube); core.style.transform = r + ' translateZ(' + (size * 0.47) + 'px)';
+    });
+    [1, 2, 3, 4, 5, 6].forEach(function (n) {
+      var f = el('div', 'dice-face', cube);
+      f.innerHTML = MT.diceFaceSVG(n);
+      f.style.transform = FACE_POS[n] + ' translateZ(' + (size / 2) + 'px)';
+    });
+    return cube;
+  };
+  // 같은 주사위 id면 칠판과 태블릿 모두 같은 모습으로 굴러감
+  BoardView.prototype.rollDice = function (d, color, done) {
+    var self = this, g = this.geo; if (!g) return;
+    if (this._diceEl) this._diceEl.remove();
+    var size = Math.round(g.H * 0.22), r = MT.rng(Math.abs(hashStr(d.id)) || 1), power = Math.max(0, Math.min(1, d.power || 0.5));
+    var wrap = el('div', 'dice-wrap', this.root), cube = MT.makeDice(size, color);
+    wrap.appendChild(cube); this._diceEl = wrap;
+    var c = g.center, endX = c.x + c.w / 2 + (r() - 0.5) * c.w * 0.2, endY = c.y + c.h - size * 0.7;
+    var dist = c.w * (0.18 + 0.32 * power), fromLeft = r() < 0.5;
+    var startX = endX + (fromLeft ? -dist : dist), startY = endY - size * (0.8 + power);
+    var bounces = 1 + Math.round(power * 3), dur = 1100 + 1300 * power;
+    var spinX = 360 * (1 + Math.round(power * 3 + r())), spinY = 360 * (1 + Math.round(power * 2 + r()));
+    var fr = FACE_ROT[d.value] || [0, 0];
+    var frames = [], steps = 40;
+    for (var i = 0; i <= steps; i++) {
+      var t = i / steps, ease = 1 - Math.pow(1 - t, 2.2);
+      var x = startX + (endX - startX) * ease;
+      var hop = Math.abs(Math.sin(t * Math.PI * (bounces + 0.5))) * (1 - t) * size * (0.9 + power);
+      var y = endY - hop + (startY - endY) * Math.max(0, 1 - t * 4) * 0;
+      var rx = (fr[0] - spinX) * (1 - ease) + fr[0] * ease, ry = (fr[1] + spinY) * (1 - ease) + fr[1] * ease;
+      frames.push({ transform: 'translate(' + (x - size / 2) + 'px,' + (y - size / 2) + 'px)', offset: t });
+      frames[i]._rot = 'rotateX(' + (rx + (1 - ease) * 0) + 'deg) rotateY(' + ry + 'deg)';
+    }
+    wrap.animate(frames.map(function (f) { return { transform: f.transform, offset: f.offset }; }), { duration: dur, easing: 'linear', fill: 'forwards' });
+    cube.animate(frames.map(function (f) { return { transform: f._rot, offset: f.offset }; }), { duration: dur, easing: 'linear', fill: 'forwards' });
+    if (this.opts.onDiceBounce) for (var b = 0; b <= bounces; b++) setTimeout(this.opts.onDiceBounce, dur * (b + 0.5) / (bounces + 0.5) * 0.9);
+    setTimeout(function () {
+      var num = el('div', 'dice-num', wrap); num.textContent = d.value;
+      if (done) done();
+      setTimeout(function () { wrap.classList.add('away'); setTimeout(function () { wrap.remove(); if (self._diceEl === wrap) self._diceEl = null; }, 500); }, 2200);
+    }, dur + 80);
+  };
+  function hashStr(s) { var h = 0; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
+
+  // 꾹 눌러 힘 조절하고 떼면 던지는 단추 (모두의 마블 방식). 힘은 굴러가는 모습에만 쓰임
+  MT.diceButton = function (label, onThrow, big) {
+    var btn = el('button', 'dice-btn' + (big ? ' big' : ''));
+    btn.type = 'button';
+    var face = el('span', 'dice-btn-face', btn); face.innerHTML = MT.diceFaceSVG(5);
+    var txt = el('span', 'dice-btn-txt', btn); txt.textContent = label;
+    var gauge = el('span', 'dice-gauge', btn), bar = el('span', 'dice-gauge-bar', gauge);
+    var t0 = 0, raf = 0, holding = false, power = 0;
+    function tick() { var t = (performance.now() - t0) / 900; power = Math.abs(((t % 2) + 2) % 2 - 1); power = 1 - power; bar.style.width = Math.round(power * 100) + '%'; raf = requestAnimationFrame(tick); }
+    btn.addEventListener('pointerdown', function (e) { e.preventDefault(); if (btn.disabled) return; holding = true; btn.classList.add('hold'); t0 = performance.now() - 900; try { btn.setPointerCapture(e.pointerId); } catch (x) {} tick(); });
+    function release() { if (!holding) return; holding = false; cancelAnimationFrame(raf); btn.classList.remove('hold'); bar.style.width = '0'; onThrow(Math.max(0.05, power)); }
+    btn.addEventListener('pointerup', release); btn.addEventListener('pointercancel', release);
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    return btn;
   };
 
   MT.BoardView = BoardView;
