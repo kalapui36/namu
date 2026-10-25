@@ -941,14 +941,21 @@
     var note = h('span', { class: 'hint', style: 'margin:0' });
     function noteText() { note.textContent = '출발 칸을 포함한 전체 칸 수예요. 처음 값 36칸은 그 선생님 초안과 같아요. 문제가 들어가는 색깔 칸은 ' + (T.cellCount - 1) + '개예요.'; }
     noteText();
-    el.appendChild(h('div', { class: 'rowf' }, [h('span', { text: '칸 수' }), stepper(T.cellCount, 12, 40, function (v) {
+    // 칸 색깔을 직접 바꾼 칸이 있는지 (색을 새로 정하기 전에 물어보기)
+    function handColored() { var g = MT.makeCellColors(T.cellCount - 1, T.seed); return T.cellColors.some(function (c, i) { return c !== g[i]; }); }
+    function askRecolor(msg) { return handColored() ? MT.ask(msg + '\n직접 바꾼 칸 색깔은 사라져요.', '바꾸기', '그대로 두기', { danger: true }) : Promise.resolve(true); }
+    var countStep = stepper(T.cellCount, 12, 40, async function (v) {
+      if (v === T.cellCount) return;
+      if (!(await askRecolor('칸 수를 바꾸면 칸 색깔이 새로 정해져요.'))) { countStep.querySelector('output').textContent = T.cellCount; return; }
       T.cellCount = v; T.cellColors = MT.makeCellColors(v - 1, T.seed); noteText();
       if (C && C.setId === T.id) { Object.keys(G.positions).forEach(function (t) { if (G.positions[t] >= v) delete G.positions[t]; }); saveClass(); }
-      saveSet(T); render(true);
-    }), note]));
-    el.appendChild(h('div', { class: 'rowf' }, [h('span', { text: '칸 색깔' }), h('button', { class: 'btn', type: 'button', text: '네 가지 색 다시 섞기', onclick: function () {
+      saveSet(T); render(true); fillRows();
+    });
+    el.appendChild(h('div', { class: 'rowf' }, [h('span', { text: '칸 수' }), countStep, note]));
+    el.appendChild(h('div', { class: 'rowf' }, [h('span', { text: '칸 색깔' }), h('button', { class: 'btn', type: 'button', text: '네 가지 색 다시 섞기', onclick: async function () {
+      if (!(await askRecolor('칸 색깔을 모두 다시 섞을까요?'))) return;
       T.seed = Math.floor(Math.random() * 1e9); T.cellColors = MT.makeCellColors(T.cellCount - 1, T.seed); saveSet(T); render(true); openSettings('questions'); toast('칸 색깔을 다시 섞었어요.');
-    } }), h('span', { class: 'hint', style: 'margin:0', text: '노랑, 파랑, 보라, 무지개가 같은 수만큼, 옆 칸과 겹치지 않게 놓여요.' })]));
+    } }), h('span', { class: 'hint', style: 'margin:0', text: '노랑, 파랑, 보라, 무지개가 같은 수만큼, 옆 칸과 겹치지 않게 놓여요. 칸 목록에서 번호 옆 색깔을 누르면 한 칸씩 바꿀 수 있어요.' })]));
 
     el.appendChild(h('h3', { text: '색깔별 미션' }));
     var grid = h('div', { class: 'mission-grid' });
@@ -962,7 +969,7 @@
     el.appendChild(grid);
 
     el.appendChild(h('h3', { text: '칸마다 문제 두 개' }));
-    el.appendChild(h('p', { class: 'hint', text: '칸을 처음 누르면 문제 1, 다음에 누르면 문제 2가 나와요. 비워 둔 칸에는 예시 문제가 나와요. “태블릿 그림판”에 체크하면 그 문제가 열릴 때 모든 모둠 태블릿에 그림판이 떠요.' }));
+    el.appendChild(h('p', { class: 'hint', text: '칸을 처음 누르면 문제 1, 다음에 누르면 문제 2가 나와요. 비워 둔 칸에는 예시 문제가 나와요. “태블릿 그림판”에 체크하면 그 문제가 열릴 때 그 칸에 도착한 모둠 태블릿에 그림판이 떠요.' }));
     var xlStatus = h('span', { class: 'hint', style: 'margin:0', 'aria-live': 'polite' });
     el.appendChild(h('div', { class: 'rowf' }, [
       h('button', { class: 'btn sky', type: 'button', text: '엑셀로 내려받기', onclick: function () { exportExcel(T).catch(function () { toast('엑셀 파일을 만들지 못했어요. 인터넷을 확인해 주세요.'); }); } }),
@@ -972,6 +979,10 @@
     ]));
     el.appendChild(h('p', { class: 'hint', text: '엑셀에는 모든 칸의 문제가 지금 게임에 나오는 그대로 적혀 있어요. 고칠 칸만 고쳐서 올리면 돼요. 칸 색깔과 미션 이름은 엑셀에서 바꿔도 반영되지 않아요(위에서 바꿔 주세요).' }));
     var rows = h('div', { class: 'q-rows' });
+    el.appendChild(rows);
+    fillRows();
+    function fillRows() {
+    rows.innerHTML = ''; S = setView(T);
     var blank = { cellColors: T.cellColors, questions: {} };
     for (var c = 1; c <= T.cellCount - 1; c++) (function (c) {
       var color = MT.cellColor(S, c), m = T.missions[color];
@@ -989,13 +1000,24 @@
         return h('label', { class: 'q-draw', for: id }, [cb, label]);
       }
       var s1 = MT.getQuestion(blank, c, 0), s2 = MT.getQuestion(blank, c, 1), isQuiz = m.kind === 'quiz';
+      // 색깔 네모를 누르면 네 가지 중에서 칸 종류 바꾸기 (써 둔 문제와 예시 답, 해결 표시는 그대로)
+      var pick = h('div', { class: 'color-pick', role: 'group', 'aria-label': c + '번 칸 색깔 고르기', hidden: true }, MT.COLOR_KEYS.map(function (k) {
+        return h('button', { class: 'swatch c-' + k, type: 'button', title: MT.COLORS[k].label + ' (' + T.missions[k].name + ')', 'aria-label': MT.COLORS[k].label + ', ' + T.missions[k].name, 'aria-pressed': k === color ? 'true' : 'false', onclick: function () {
+          if (k !== color) { T.cellColors[c - 1] = k; saveSet(T); render(true); toast(c + '번 칸을 ' + T.missions[k].name + ' 칸으로 바꿨어요.'); }
+          fillRows();
+        } });
+      }));
+      var sw = h('button', { class: 'swatch c-' + color, type: 'button', text: c, title: '눌러서 칸 색깔 바꾸기', 'aria-label': c + '번 칸, ' + MT.COLORS[color].label + '. 눌러서 색깔 바꾸기', 'aria-expanded': 'false', onclick: function () {
+        rows.querySelectorAll('.color-pick').forEach(function (o) { if (o !== pick) { o.hidden = true; o.previousSibling.setAttribute('aria-expanded', 'false'); } });
+        pick.hidden = !pick.hidden; sw.setAttribute('aria-expanded', pick.hidden ? 'false' : 'true');
+      } });
       rows.appendChild(h('div', { class: 'q-row' }, [
-        h('div', { class: 'q-num' }, [h('span', { class: 'swatch c-' + color, text: c }), h('small', { text: m.name })]),
+        h('div', { class: 'q-num' }, [sw, pick, h('small', { text: m.name })]),
         h('div', { class: 'q-pair' }, [ta('q1', '문제 1 (예시: ' + s1.text + ')'), isQuiz ? ta('a1', '예시 답 1 (여러 개면 / 로 나눠 쓰기)', true) : null, drawBox('d1', '태블릿 그림판')]),
         h('div', { class: 'q-pair' }, [ta('q2', '문제 2 (예시: ' + s2.text + ')'), isQuiz ? ta('a2', '예시 답 2 (여러 개면 / 로 나눠 쓰기)', true) : null, drawBox('d2', '태블릿 그림판')])
       ]));
     })(c);
-    el.appendChild(rows);
+    }
   }
   /* 엑셀 내려받기, 올리기 */
   var xlsxReady = null;
