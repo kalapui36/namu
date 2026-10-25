@@ -114,7 +114,8 @@
   }
 
   function drawPopup() {
-    var p = state.popup, key = JSON.stringify(p || null);
+    // 문제 창은 그 칸에 도착한 모둠 태블릿에만 (모둠을 모르면 칠판에만)
+    var p = state.popup && state.popup.team === team ? state.popup : null, key = JSON.stringify(p);
     if (key === lastPopup) return;
     lastPopup = key;
     var old = $('#tq'); if (old) old.remove();
